@@ -1,0 +1,14 @@
+<?xml version="1.0"?>
+<!DOCTYPE node PUBLIC "-//freedesktop//DTD D-BUS Object Introspection 1.0//EN" "http://www.freedesktop.org/standards/dbus/1.0/introspect.dtd">
+<node xmlns:doc="http://www.freedesktop.org/dbus/1.0/doc.dtd" name="/">
+  <interface name="org.hwangsaeul.Hwangsae1.Manager">
+    <!--
+    Status:
+
+    Status of the object.
+    Valid statuses: -1 = Error, 0 = None, 1 = Ready, 2 = Running.
+    Unrecognized statuses should be considered equal to Error.
+    -->
+    <property name="Status" type="i" access="read"/>
+  </interface>
+</node>

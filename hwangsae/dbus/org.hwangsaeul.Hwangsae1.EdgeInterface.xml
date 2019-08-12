@@ -1,0 +1,68 @@
+<?xml version="1.0"?>
+<!DOCTYPE node PUBLIC "-//freedesktop//DTD D-BUS Object Introspection 1.0//EN" "http://www.freedesktop.org/standards/dbus/1.0/introspect.dtd">
+<node xmlns:doc="http://www.freedesktop.org/dbus/1.0/doc.dtd" name="/">
+  <interface name="org.hwangsaeul.Hwangsae1.EdgeInterface">
+
+    <!--
+    Register:
+    @id:        an unique id of edge
+    @mode:      0 = Unknown, 1 = Caller, 2 = Listener, 3 = Rendezvous
+
+    Register Edge for relaying SRT stream accordance of @mode of Edge.
+    Note that @mode indicates the behaviour of Edge, not relay server.
+    -->
+    <method name="Register">
+      <arg name="id" direction="in" type="s"/>
+      <arg name="mode" direction="in" type="u"/>
+    </method>
+
+    <!--
+    Delete:
+    @id:        an unique id of edge
+
+    Delete Edge by @id. When requested deletion, the relevant pipelines stop immediately.
+    -->
+    <method name="Delete">
+      <arg name="id" direction="in" type="s"/>
+    </method>
+
+    <!--
+    Stop:
+    @id:        an unique id of edge
+
+    Send stop request to Edge by @id.
+    -->
+    <method name="Stop">
+      <arg name="id" direction="in" type="s"/>
+    </method>
+
+    <!--
+    Start:
+    @id:        an unique id of edge
+
+    Send start request to Edge by @id.
+    -->
+    <method name="Start">
+      <arg name="id" direction="in" type="s"/>
+    </method>
+
+    <!--
+    GetEdgeStatus:
+    @id:        an unique id of edge
+    @state:     0 = None, 1 = Ready, 2 = Streaming
+  
+    Retrieve the information of Edge by @id
+    --> 
+    <method name="GetEdgeStatus">
+      <arg name="id" direction="in" type="s"/>
+      <arg name="state" direction="out" type="u"/>
+    </method>
+
+    <!--
+    Edges:
+
+    The number of Edges
+    -->
+    <property name="Edges" type="u" access="read"/>
+  </interface>
+</node>
