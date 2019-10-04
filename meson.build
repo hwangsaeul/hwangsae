@@ -56,6 +56,7 @@ common_ldflags = [ ]
 
 subdir('hwangsae')
 subdir('agent')
+subdir('tools')
 subdir('tests')
 
 run_command(python3, '-c', 'import shutil; shutil.copy("hooks/pre-commit.hook", ".git/hooks/pre-commit")')
