@@ -51,11 +51,38 @@ hwangsae_recorder_new (void)
   return g_object_new (HWANGSAE_TYPE_RECORDER, NULL);
 }
 
+static void
+hwangsae_recorder_stop_recording_internal (HwangsaeRecorder * self)
+{
+  HwangsaeRecorderPrivate *priv = hwangsae_recorder_get_instance_private (self);
+
+  gst_element_set_state (priv->pipeline, GST_STATE_NULL);
+  gst_clear_object (&priv->pipeline);
+
+  g_signal_emit (self, signals[FILE_COMPLETED_SIGNAL], 0, priv->recording_path);
+  g_clear_pointer (&priv->recording_path, g_free);
+
+  g_debug ("Recording stopped");
+}
+
+static gboolean
+gst_bus_cb (GstBus * bus, GstMessage * message, gpointer data)
+{
+  if (message->type == GST_MESSAGE_EOS) {
+    hwangsae_recorder_stop_recording_internal (HWANGSAE_RECORDER (data));
+  } else {
+    g_debug ("Got Gst message %s", GST_MESSAGE_TYPE_NAME (message));
+  }
+
+  return TRUE;
+}
+
 void
 hwangsae_recorder_start_recording (HwangsaeRecorder * self, const gchar * uri)
 {
   HwangsaeRecorderPrivate *priv = hwangsae_recorder_get_instance_private (self);
 
+  g_autoptr (GstBus) bus = NULL;
   g_autofree gchar *pipeline_str = NULL;
   g_autoptr (GError) error = NULL;
 
@@ -70,6 +97,10 @@ hwangsae_recorder_start_recording (HwangsaeRecorder * self, const gchar * uri)
       uri, priv->recording_path);
 
   priv->pipeline = gst_parse_launch (pipeline_str, &error);
+
+  bus = gst_element_get_bus (priv->pipeline);
+  gst_bus_add_watch (bus, gst_bus_cb, self);
+
   gst_element_set_state (priv->pipeline, GST_STATE_PLAYING);
 
   g_signal_emit (self, signals[FILE_CREATED_SIGNAL], 0, priv->recording_path);
@@ -80,14 +111,13 @@ hwangsae_recorder_stop_recording (HwangsaeRecorder * self)
 {
   HwangsaeRecorderPrivate *priv = hwangsae_recorder_get_instance_private (self);
 
+  g_autoptr (GstElement) srcbin = NULL;
+
   g_return_if_fail (priv->pipeline);
 
-  // TODO: flush the pipeline contents, etc.
-  gst_element_set_state (priv->pipeline, GST_STATE_NULL);
-  gst_clear_object (&priv->pipeline);
+  srcbin = gst_bin_get_by_name (GST_BIN (priv->pipeline), "srcbin");
 
-  g_signal_emit (self, signals[FILE_COMPLETED_SIGNAL], 0, priv->recording_path);
-  g_clear_pointer (&priv->recording_path, g_free);
+  gst_element_send_event (srcbin, gst_event_new_eos ());
 }
 
 static void
