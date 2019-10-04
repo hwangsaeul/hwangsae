@@ -32,6 +32,13 @@ G_DECLARE_FINAL_TYPE            (HwangsaeRecorder, hwangsae_recorder, HWANGSAE, 
 
 HwangsaeRecorder       *hwangsae_recorder_new          (void);
 
+void                    hwangsae_recorder_start_recording
+                                                       (HwangsaeRecorder * self,
+                                                        const gchar * uri);
+
+void                    hwangsae_recorder_stop_recording
+                                                       (HwangsaeRecorder * self);
+
 G_END_DECLS
 
 #endif // __HWANGSAE_RECORDER_H__

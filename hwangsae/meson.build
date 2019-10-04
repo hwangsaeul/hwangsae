@@ -37,7 +37,7 @@ libhwangsae = library(
   version: libversion,
   soversion: soversion,
   include_directories: hwangsae_incs,
-  dependencies: [ gobject_dep ],
+  dependencies: [ gstreamer_dep ],
   c_args: hwangsae_c_args,
   link_args: common_ldflags,
   install: true
