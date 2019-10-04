@@ -3,10 +3,13 @@ hwangsae_install_header_subdir = join_paths(hwangsae_api_name, 'hwangsae')
 configure_file(output: 'config.h', configuration: cdata)
 
 source_h = [
+  'hwangsae.h',
+  'recorder.h',
   'types.h',
 ]
 
 source_c = [
+  'recorder.c',
 ]
 
 install_headers(source_h, subdir: hwangsae_install_header_subdir)
