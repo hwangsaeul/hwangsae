@@ -38,6 +38,7 @@ G_DEFINE_TYPE_WITH_PRIVATE (HwangsaeRecorder, hwangsae_recorder, G_TYPE_OBJECT)
 
 enum
 {
+  STREAM_CONNECTED_SIGNAL,
   FILE_CREATED_SIGNAL,
   FILE_COMPLETED_SIGNAL,
   LAST_SIGNAL
@@ -65,14 +66,28 @@ hwangsae_recorder_stop_recording_internal (HwangsaeRecorder * self)
   g_debug ("Recording stopped");
 }
 
+static void
+hwangsae_recorder_emit_stream_connected (HwangsaeRecorder * self)
+{
+  g_signal_emit (self, signals[STREAM_CONNECTED_SIGNAL], 0);
+}
+
 static gboolean
 gst_bus_cb (GstBus * bus, GstMessage * message, gpointer data)
 {
-  if (message->type == GST_MESSAGE_EOS) {
-    hwangsae_recorder_stop_recording_internal (HWANGSAE_RECORDER (data));
-  } else {
-    g_debug ("Got Gst message %s", GST_MESSAGE_TYPE_NAME (message));
+  switch (message->type) {
+    case GST_MESSAGE_EOS:
+      hwangsae_recorder_stop_recording_internal (HWANGSAE_RECORDER (data));
+      break;
+    case GST_MESSAGE_STREAM_START:
+      hwangsae_recorder_emit_stream_connected (HWANGSAE_RECORDER (data));
+      break;
+    default:
+      break;
   }
+
+  g_debug ("Got Gst message %s from %s", GST_MESSAGE_TYPE_NAME (message),
+      GST_MESSAGE_SRC_NAME (message));
 
   return TRUE;
 }
@@ -123,6 +138,10 @@ hwangsae_recorder_stop_recording (HwangsaeRecorder * self)
 static void
 hwangsae_recorder_class_init (HwangsaeRecorderClass * klass)
 {
+  signals[STREAM_CONNECTED_SIGNAL] =
+      g_signal_new ("stream-connected", G_TYPE_FROM_CLASS (klass),
+      G_SIGNAL_RUN_LAST, 0, NULL, NULL, NULL, G_TYPE_NONE, 0);
+
   signals[FILE_CREATED_SIGNAL] =
       g_signal_new ("file-created", G_TYPE_FROM_CLASS (klass),
       G_SIGNAL_RUN_LAST, 0, NULL, NULL, NULL, G_TYPE_NONE, 1, G_TYPE_STRING);
