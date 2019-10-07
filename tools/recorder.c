@@ -42,6 +42,13 @@ intr_handler (gpointer user_data)
 }
 
 static void
+stream_connected_cb (HwangsaeRecorder * recorder, gpointer unused)
+{
+  g_print ("Stream connected\n");
+}
+
+
+static void
 file_created_cb (HwangsaeRecorder * recorder, const gchar * file_path,
     gpointer unused)
 {
@@ -108,10 +115,12 @@ main (int argc, char *argv[])
   }
 
   recorder = hwangsae_recorder_new ();
-  g_signal_connect (recorder, "file-created", (GCallback) file_created_cb,
-      NULL);
-  g_signal_connect (recorder, "file-completed", (GCallback) file_completed_cb,
-      app);
+  g_signal_connect (recorder, "stream-connected",
+      (GCallback) stream_connected_cb, NULL);
+  g_signal_connect (recorder, "file-created",
+      (GCallback) file_created_cb, NULL);
+  g_signal_connect (recorder, "file-completed",
+      (GCallback) file_completed_cb, app);
 
   g_unix_signal_add (SIGINT, (GSourceFunc) intr_handler, recorder);
 
