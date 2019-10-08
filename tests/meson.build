@@ -1,4 +1,5 @@
 tests = [
+  'test-recorder',
 ]
 
 foreach t: tests
@@ -8,7 +9,7 @@ foreach t: tests
     t, '@0@.c'.format(t),
     c_args: '-DG_LOG_DOMAIN="hwangsae-tests"',
     include_directories: hwangsae_incs,
-    dependencies: [ libhwangsae_dep ],
+    dependencies: [ libhwangsae_dep, gaeguli_dep, gstreamer_pbutils_dep ],
     install: false,
   )
 
