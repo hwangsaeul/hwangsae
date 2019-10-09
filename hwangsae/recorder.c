@@ -58,7 +58,7 @@ hwangsae_recorder_stop_recording_internal (HwangsaeRecorder * self)
   HwangsaeRecorderPrivate *priv = hwangsae_recorder_get_instance_private (self);
 
   gst_element_set_state (priv->pipeline, GST_STATE_NULL);
-  gst_clear_object (&priv->pipeline);
+  g_clear_pointer (&priv->pipeline, gst_object_unref);
 
   g_signal_emit (self, signals[FILE_COMPLETED_SIGNAL], 0, priv->recording_path);
   g_clear_pointer (&priv->recording_path, g_free);
