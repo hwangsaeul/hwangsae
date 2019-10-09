@@ -76,11 +76,17 @@ static gboolean
 gst_bus_cb (GstBus * bus, GstMessage * message, gpointer data)
 {
   switch (message->type) {
+    case GST_MESSAGE_APPLICATION:{
+      const gchar *name =
+          gst_structure_get_name (gst_message_get_structure (message));
+
+      if (g_str_equal (name, "hwangsae-recorder-first-frame")) {
+        hwangsae_recorder_emit_stream_connected (HWANGSAE_RECORDER (data));
+      }
+      break;
+    }
     case GST_MESSAGE_EOS:
       hwangsae_recorder_stop_recording_internal (HWANGSAE_RECORDER (data));
-      break;
-    case GST_MESSAGE_STREAM_START:
-      hwangsae_recorder_emit_stream_connected (HWANGSAE_RECORDER (data));
       break;
     default:
       break;
@@ -92,12 +98,24 @@ gst_bus_cb (GstBus * bus, GstMessage * message, gpointer data)
   return TRUE;
 }
 
+static GstPadProbeReturn
+first_buffer_cb (GstPad * pad, GstPadProbeInfo * info, gpointer data)
+{
+  gst_bus_post (GST_BUS (data),
+      gst_message_new_application (NULL,
+          gst_structure_new_empty ("hwangsae-recorder-first-frame")));
+
+  return GST_PAD_PROBE_REMOVE;
+}
+
 void
 hwangsae_recorder_start_recording (HwangsaeRecorder * self, const gchar * uri)
 {
   HwangsaeRecorderPrivate *priv = hwangsae_recorder_get_instance_private (self);
 
   g_autoptr (GstBus) bus = NULL;
+  g_autoptr (GstElement) parse = NULL;
+  g_autoptr (GstPad) parse_src = NULL;
   g_autofree gchar *pipeline_str = NULL;
   g_autoptr (GError) error = NULL;
 
@@ -108,13 +126,19 @@ hwangsae_recorder_start_recording (HwangsaeRecorder * self, const gchar * uri)
 
   pipeline_str =
       g_strdup_printf
-      ("urisourcebin uri=%s name=srcbin ! tsdemux ! h264parse ! mp4mux ! filesink location=%s",
+      ("urisourcebin uri=%s name=srcbin ! tsdemux ! h264parse name=parse ! mp4mux ! filesink location=%s",
       uri, priv->recording_path);
 
   priv->pipeline = gst_parse_launch (pipeline_str, &error);
 
   bus = gst_element_get_bus (priv->pipeline);
   gst_bus_add_watch (bus, gst_bus_cb, self);
+
+  parse = gst_bin_get_by_name (GST_BIN (priv->pipeline), "parse");
+  parse_src = gst_element_get_static_pad (parse, "src");
+  gst_pad_add_probe (parse_src,
+      GST_PAD_PROBE_TYPE_BUFFER | GST_PAD_PROBE_TYPE_BUFFER_LIST,
+      first_buffer_cb, bus, NULL);
 
   gst_element_set_state (priv->pipeline, GST_STATE_PLAYING);
 
