@@ -13,6 +13,10 @@ jobs:
     displayName: 'Adding hwangsaeul PPA'
 
   - bash: |
+      sudo apt-get install libgaeguli-dev
+    displayName: 'Installing dependencies'
+
+  - bash: |
       pip3 install --user meson ninja
     displayName: 'Preparing Meson'
 
