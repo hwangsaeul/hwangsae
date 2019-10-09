@@ -163,6 +163,12 @@ file_completed_cb (HwangsaeRecorder * recorder, const gchar * file_path,
 
   g_assert_cmpint (labs (GST_CLOCK_DIFF (duration, 5 * GST_SECOND)), <=,
       GST_SECOND);
+}
+
+static void
+stream_disconnected_cb (HwangsaeRecorder * recorder, TestFixture * fixture)
+{
+  g_debug ("Stream disconnected");
 
   gaeguli_pipeline_stop (fixture->pipeline);
   stop_streaming (fixture);
@@ -179,6 +185,8 @@ test_hwangsae_recorder_record (TestFixture * fixture, gconstpointer unused)
       (GCallback) stream_connected_cb, fixture);
   g_signal_connect (fixture->recorder, "file-completed",
       (GCallback) file_completed_cb, fixture);
+  g_signal_connect (fixture->recorder, "stream-disconnected",
+      (GCallback) stream_disconnected_cb, fixture);
 
   start_streaming (fixture);
 
