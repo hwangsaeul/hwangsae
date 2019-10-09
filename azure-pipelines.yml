@@ -7,6 +7,12 @@ jobs:
   pool: 'Ubuntu1804'
   steps:
   - bash: |
+      sudo apt-get install software-properties-common
+      sudo add-apt-repository ppa:hwangsaeul/ppa
+      sudo apt-get update
+    displayName: 'Adding hwangsaeul PPA'
+
+  - bash: |
       pip3 install --user meson ninja
     displayName: 'Preparing Meson'
 
