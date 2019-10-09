@@ -39,6 +39,7 @@ G_DEFINE_TYPE_WITH_PRIVATE (HwangsaeRecorder, hwangsae_recorder, G_TYPE_OBJECT)
 enum
 {
   STREAM_CONNECTED_SIGNAL,
+  STREAM_DISCONNECTED_SIGNAL,
   FILE_CREATED_SIGNAL,
   FILE_COMPLETED_SIGNAL,
   LAST_SIGNAL
@@ -62,6 +63,8 @@ hwangsae_recorder_stop_recording_internal (HwangsaeRecorder * self)
 
   g_signal_emit (self, signals[FILE_COMPLETED_SIGNAL], 0, priv->recording_path);
   g_clear_pointer (&priv->recording_path, g_free);
+
+  g_signal_emit (self, signals[STREAM_DISCONNECTED_SIGNAL], 0);
 
   g_debug ("Recording stopped");
 }
@@ -164,6 +167,10 @@ hwangsae_recorder_class_init (HwangsaeRecorderClass * klass)
 {
   signals[STREAM_CONNECTED_SIGNAL] =
       g_signal_new ("stream-connected", G_TYPE_FROM_CLASS (klass),
+      G_SIGNAL_RUN_LAST, 0, NULL, NULL, NULL, G_TYPE_NONE, 0);
+
+  signals[STREAM_DISCONNECTED_SIGNAL] =
+      g_signal_new ("stream-disconnected", G_TYPE_FROM_CLASS (klass),
       G_SIGNAL_RUN_LAST, 0, NULL, NULL, NULL, G_TYPE_NONE, 0);
 
   signals[FILE_CREATED_SIGNAL] =
