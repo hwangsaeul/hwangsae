@@ -29,12 +29,20 @@ typedef struct
 {
   GstElement *pipeline;
 
-  gchar *recording_path;
+  gchar *recording_file;
+
+  gchar *recording_dir;
 } HwangsaeRecorderPrivate;
 
 /* *INDENT-OFF* */
 G_DEFINE_TYPE_WITH_PRIVATE (HwangsaeRecorder, hwangsae_recorder, G_TYPE_OBJECT)
 /* *INDENT-ON* */
+
+enum
+{
+  PROP_RECORDING_DIR = 1,
+  PROP_LAST
+};
 
 enum
 {
@@ -61,8 +69,8 @@ hwangsae_recorder_stop_recording_internal (HwangsaeRecorder * self)
   gst_element_set_state (priv->pipeline, GST_STATE_NULL);
   g_clear_pointer (&priv->pipeline, gst_object_unref);
 
-  g_signal_emit (self, signals[FILE_COMPLETED_SIGNAL], 0, priv->recording_path);
-  g_clear_pointer (&priv->recording_path, g_free);
+  g_signal_emit (self, signals[FILE_COMPLETED_SIGNAL], 0, priv->recording_file);
+  g_clear_pointer (&priv->recording_file, g_free);
 
   g_signal_emit (self, signals[STREAM_DISCONNECTED_SIGNAL], 0);
 
@@ -119,18 +127,23 @@ hwangsae_recorder_start_recording (HwangsaeRecorder * self, const gchar * uri)
   g_autoptr (GstBus) bus = NULL;
   g_autoptr (GstElement) parse = NULL;
   g_autoptr (GstPad) parse_src = NULL;
+  g_autofree gchar *recording_file = NULL;
   g_autofree gchar *pipeline_str = NULL;
   g_autoptr (GError) error = NULL;
 
   g_return_if_fail (!priv->pipeline);
 
-  priv->recording_path =
-      g_strdup_printf ("/tmp/hwangsae-recording-%ld.mp4", g_get_real_time ());
+  g_mkdir_with_parents (priv->recording_dir, 0750);
+
+  recording_file = g_build_filename (priv->recording_dir,
+      "hwangsae-recording-%ld.mp4", NULL);
+  recording_file = g_strdup_printf (recording_file, g_get_real_time ());
+  priv->recording_file = g_steal_pointer (&recording_file);
 
   pipeline_str =
       g_strdup_printf
       ("urisourcebin uri=%s name=srcbin ! tsdemux ! h264parse name=parse ! mp4mux ! filesink location=%s",
-      uri, priv->recording_path);
+      uri, priv->recording_file);
 
   priv->pipeline = gst_parse_launch (pipeline_str, &error);
 
@@ -145,7 +158,7 @@ hwangsae_recorder_start_recording (HwangsaeRecorder * self, const gchar * uri)
 
   gst_element_set_state (priv->pipeline, GST_STATE_PLAYING);
 
-  g_signal_emit (self, signals[FILE_CREATED_SIGNAL], 0, priv->recording_path);
+  g_signal_emit (self, signals[FILE_CREATED_SIGNAL], 0, priv->recording_file);
 }
 
 void
@@ -163,8 +176,53 @@ hwangsae_recorder_stop_recording (HwangsaeRecorder * self)
 }
 
 static void
+hwangsae_recorder_set_property (GObject * object, guint property_id,
+    const GValue * value, GParamSpec * pspec)
+{
+  HwangsaeRecorderPrivate *priv =
+      hwangsae_recorder_get_instance_private (HWANGSAE_RECORDER (object));
+
+  switch (property_id) {
+    case PROP_RECORDING_DIR:
+      g_clear_pointer (&priv->recording_dir, g_free);
+      priv->recording_dir = g_strdup (g_value_get_string (value));
+      break;
+
+    default:
+      G_OBJECT_WARN_INVALID_PROPERTY_ID (object, property_id, pspec);
+  }
+}
+
+static void
+hwangsae_recorder_get_property (GObject * object, guint property_id,
+    GValue * value, GParamSpec * pspec)
+{
+  HwangsaeRecorderPrivate *priv =
+      hwangsae_recorder_get_instance_private (HWANGSAE_RECORDER (object));
+
+  switch (property_id) {
+    case PROP_RECORDING_DIR:
+      g_value_set_string (value, priv->recording_dir);
+      break;
+
+    default:
+      G_OBJECT_WARN_INVALID_PROPERTY_ID (object, property_id, pspec);
+  }
+}
+
+static void
 hwangsae_recorder_class_init (HwangsaeRecorderClass * klass)
 {
+  GObjectClass *gobject_class = G_OBJECT_CLASS (klass);
+
+  gobject_class->set_property = hwangsae_recorder_set_property;
+  gobject_class->get_property = hwangsae_recorder_get_property;
+
+  g_object_class_install_property (gobject_class, PROP_RECORDING_DIR,
+      g_param_spec_string ("recording-dir", "Recording directory",
+          "Recording directory", "/tmp",
+          G_PARAM_READWRITE | G_PARAM_CONSTRUCT | G_PARAM_STATIC_STRINGS));
+
   signals[STREAM_CONNECTED_SIGNAL] =
       g_signal_new ("stream-connected", G_TYPE_FROM_CLASS (klass),
       G_SIGNAL_RUN_LAST, 0, NULL, NULL, NULL, G_TYPE_NONE, 0);
