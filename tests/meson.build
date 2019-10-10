@@ -6,11 +6,15 @@ env = environment()
 env.set('G_TEST_SRCDIR', meson.current_source_dir())
 env.set('G_TEST_BUILDDIR', meson.current_build_dir())
 
+# Use uninstalled schema and dummy GSettings backend in tests
+env.set('GSETTINGS_SCHEMA_DIR', hwangsae_schemas.full_path())
+env.set('GSETTINGS_BACKEND', 'memory')
+
 foreach t: tests
   installed_test = '@0@.test'.format(t)
 
   exe = executable(
-    t, '@0@.c'.format(t),
+    t, ['@0@.c'.format(t), hwangsae_schemas],
     c_args: '-DG_LOG_DOMAIN="hwangsae-tests"',
     include_directories: hwangsae_incs,
     dependencies: [ libhwangsae_dep, gaeguli_dep, gstreamer_pbutils_dep ],
