@@ -2,6 +2,10 @@ tests = [
   'test-recorder',
 ]
 
+env = environment()
+env.set('G_TEST_SRCDIR', meson.current_source_dir())
+env.set('G_TEST_BUILDDIR', meson.current_build_dir())
+
 foreach t: tests
   installed_test = '@0@.test'.format(t)
 
@@ -12,10 +16,6 @@ foreach t: tests
     dependencies: [ libhwangsae_dep, gaeguli_dep, gstreamer_pbutils_dep ],
     install: false,
   )
-
-  env = environment()
-  env.set('G_TEST_SRCDIR', meson.current_source_dir())
-  env.set('G_TEST_BUILDDIR', meson.current_build_dir())
 
   test(
     t, exe,
