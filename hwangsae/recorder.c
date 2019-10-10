@@ -18,6 +18,7 @@
 
 #include "recorder.h"
 
+#include <gio/gio.h>
 #include <gst/gst.h>
 
 struct _HwangsaeRecorder
@@ -27,6 +28,7 @@ struct _HwangsaeRecorder
 
 typedef struct
 {
+  GSettings *settings;
   GstElement *pipeline;
 
   gchar *recording_file;
@@ -220,8 +222,8 @@ hwangsae_recorder_class_init (HwangsaeRecorderClass * klass)
 
   g_object_class_install_property (gobject_class, PROP_RECORDING_DIR,
       g_param_spec_string ("recording-dir", "Recording directory",
-          "Recording directory", "/tmp",
-          G_PARAM_READWRITE | G_PARAM_CONSTRUCT | G_PARAM_STATIC_STRINGS));
+          "Recording directory", NULL,
+          G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS));
 
   signals[STREAM_CONNECTED_SIGNAL] =
       g_signal_new ("stream-connected", G_TYPE_FROM_CLASS (klass),
@@ -243,4 +245,17 @@ hwangsae_recorder_class_init (HwangsaeRecorderClass * klass)
 static void
 hwangsae_recorder_init (HwangsaeRecorder * self)
 {
+  HwangsaeRecorderPrivate *priv = hwangsae_recorder_get_instance_private (self);
+
+  priv->settings = g_settings_new ("org.hwangsaeul.hwangsae");
+
+  g_settings_bind (priv->settings, "recording-dir", self, "recording-dir",
+      G_SETTINGS_BIND_DEFAULT);
+
+  if (g_str_equal (priv->recording_dir, "")) {
+    g_autofree gchar *dir = g_build_filename (g_get_user_data_dir (),
+        "hwangsaeul", "hwangsae", "recordings", NULL);
+
+    g_object_set (self, "recording-dir", dir, NULL);
+  }
 }

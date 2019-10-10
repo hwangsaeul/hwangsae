@@ -44,6 +44,7 @@ fixture_setup (TestFixture * fixture, gconstpointer unused)
   fixture->transmit = gaeguli_fifo_transmit_new ();
   fixture->pipeline = gaeguli_pipeline_new ();
   fixture->recorder = hwangsae_recorder_new ();
+  g_object_set (fixture->recorder, "recording-dir", "/tmp", NULL);
 
   gaeguli_pipeline_add_fifo_target_full (fixture->pipeline,
       GAEGULI_VIDEO_CODEC_H264, GAEGULI_VIDEO_RESOLUTION_640x480,

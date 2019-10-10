@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<schemalist>
+  <schema id="org.hwangsaeul.hwangsae" path="/org/hwangsaeul/hwangsae/">
+    <key name="recording-dir" type="s">
+      <default>""</default>
+      <summary>Recording directory</summary>
+      <description>Where Hwangsae recorder stores its files</description>
+    </key>
+  </schema>
+</schemalist>
