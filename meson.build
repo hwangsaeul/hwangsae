@@ -47,7 +47,11 @@ gobject_dep = dependency('gobject-2.0', version: glib_req_version,
     fallback: ['glib', 'libgobject_dep'])
 gstreamer_dep = dependency ('gstreamer-1.0', version: '>= 1.14.0')
 gstreamer_pbutils_dep = dependency ('gstreamer-pbutils-1.0')
-gaeguli_dep = dependency ('gaeguli-1.0')
+
+hwangsaeul_req_version = '>= 0.9.0'
+
+gaeguli_dep = dependency('gaeguli-1.0', version: hwangsaeul_req_version,
+    fallback: ['gaeguli', 'libgaeguli_dep'])
 
 gnome = import('gnome')
 python3 = import('python').find_installation()

@@ -56,3 +56,6 @@ dkms.conf
 
 # build
 build/
+
+# subprojects
+subprojects/gaeguli/
