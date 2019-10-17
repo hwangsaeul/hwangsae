@@ -42,7 +42,9 @@ fixture_setup (TestFixture * fixture, gconstpointer unused)
 
   fixture->loop = g_main_loop_new (NULL, FALSE);
   fixture->transmit = gaeguli_fifo_transmit_new ();
-  fixture->pipeline = gaeguli_pipeline_new ();
+  fixture->pipeline =
+      gaeguli_pipeline_new_full (GAEGULI_VIDEO_SOURCE_VIDEOTESTSRC, NULL,
+      GAEGULI_ENCODING_METHOD_GENERAL);
   fixture->recorder = hwangsae_recorder_new ();
   g_object_set (fixture->recorder, "recording-dir", "/tmp", NULL);
 
