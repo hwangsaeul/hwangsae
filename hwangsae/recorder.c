@@ -247,7 +247,7 @@ hwangsae_recorder_init (HwangsaeRecorder * self)
 {
   HwangsaeRecorderPrivate *priv = hwangsae_recorder_get_instance_private (self);
 
-  priv->settings = g_settings_new ("org.hwangsaeul.hwangsae");
+  priv->settings = g_settings_new ("org.hwangsaeul.hwangsae.recorder");
 
   g_settings_bind (priv->settings, "recording-dir", self, "recording-dir",
       G_SETTINGS_BIND_DEFAULT);
