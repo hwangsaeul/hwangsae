@@ -7,7 +7,7 @@ env.set('G_TEST_SRCDIR', meson.current_source_dir())
 env.set('G_TEST_BUILDDIR', meson.current_build_dir())
 
 # Use uninstalled schema and dummy GSettings backend in tests
-env.set('GSETTINGS_SCHEMA_DIR', hwangsae_schemas.full_path())
+env.set('GSETTINGS_SCHEMA_DIR', hwangsae_schemas_dir)
 env.set('GSETTINGS_BACKEND', 'memory')
 
 foreach t: tests
