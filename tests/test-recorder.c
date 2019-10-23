@@ -140,6 +140,8 @@ get_file_duration (const gchar * file_path)
   return gst_discoverer_info_get_duration (info);
 }
 
+// recorder-record -------------------------------------------------------------
+
 static gboolean
 stop_recording_timeout_cb (TestFixture * fixture)
 {
@@ -198,6 +200,86 @@ test_hwangsae_recorder_record (TestFixture * fixture, gconstpointer unused)
   g_main_loop_run (fixture->loop);
 }
 
+// recorder-disconnect ---------------------------------------------------------
+
+const guint SEGMENT_LEN_SECONDS = 5;
+
+static void
+recording_done_cb (HwangsaeRecorder * recorder, const gchar * file_path,
+    TestFixture * fixture)
+{
+  GstClockTime duration;
+  const GstClockTime expected_duration = 3 * SEGMENT_LEN_SECONDS * GST_SECOND;
+
+  gaeguli_pipeline_stop (fixture->pipeline);
+  stop_streaming (fixture);
+
+  duration = get_file_duration (file_path);
+
+  g_debug ("Finished recording %s, duration %" GST_TIME_FORMAT, file_path,
+      GST_TIME_ARGS (duration));
+
+  g_assert_cmpint (labs (GST_CLOCK_DIFF (duration, expected_duration)), <=,
+      GST_SECOND);
+
+  g_main_loop_quit (fixture->loop);
+}
+
+static gboolean
+second_segment_done_cb (TestFixture * fixture)
+{
+  g_debug ("Second segment done.");
+  hwangsae_recorder_stop_recording (fixture->recorder);
+
+  return G_SOURCE_REMOVE;
+}
+
+static gboolean
+second_segment_started_cb (TestFixture * fixture)
+{
+  g_debug ("Recording second segment of %u seconds.", SEGMENT_LEN_SECONDS);
+  start_streaming (fixture);
+  g_timeout_add_seconds (SEGMENT_LEN_SECONDS,
+      (GSourceFunc) second_segment_done_cb, fixture);
+
+  return G_SOURCE_REMOVE;
+}
+
+static gboolean
+first_segment_done_cb (TestFixture * fixture)
+{
+  g_debug ("First segment done. Stopping streaming for %u seconds.",
+      SEGMENT_LEN_SECONDS);
+  stop_streaming (fixture);
+  g_timeout_add_seconds (SEGMENT_LEN_SECONDS,
+      (GSourceFunc) second_segment_started_cb, fixture);
+
+  return G_SOURCE_REMOVE;
+}
+
+static void
+first_segment_started_cb (HwangsaeRecorder * recorder, TestFixture * fixture)
+{
+  g_debug ("Recording first segment of 5 seconds.");
+  g_timeout_add_seconds (SEGMENT_LEN_SECONDS,
+      (GSourceFunc) first_segment_done_cb, fixture);
+}
+
+static void
+test_hwangsae_recorder_disconnect (TestFixture * fixture, gconstpointer unused)
+{
+  g_signal_connect (fixture->recorder, "stream-connected",
+      (GCallback) first_segment_started_cb, fixture);
+  g_signal_connect (fixture->recorder, "file-completed",
+      (GCallback) recording_done_cb, fixture);
+
+  start_streaming (fixture);
+
+  hwangsae_recorder_start_recording (fixture->recorder, "srt://127.0.0.1:8888");
+
+  g_main_loop_run (fixture->loop);
+}
+
 int
 main (int argc, char *argv[])
 {
@@ -208,6 +290,10 @@ main (int argc, char *argv[])
   g_test_add ("/hwangsae/recorder-record",
       TestFixture, NULL, fixture_setup,
       test_hwangsae_recorder_record, fixture_teardown);
+
+  g_test_add ("/hwangsae/recorder-disconnect",
+      TestFixture, NULL, fixture_setup,
+      test_hwangsae_recorder_disconnect, fixture_teardown);
 
   return g_test_run ();
 }
