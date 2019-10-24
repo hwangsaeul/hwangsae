@@ -25,12 +25,18 @@
 
 #include <glib-object.h>
 
+#include "types.h"
+
 G_BEGIN_DECLS
 
 #define HWANGSAE_TYPE_RECORDER  (hwangsae_recorder_get_type ())
 G_DECLARE_FINAL_TYPE            (HwangsaeRecorder, hwangsae_recorder, HWANGSAE, RECORDER, GObject)
 
 HwangsaeRecorder       *hwangsae_recorder_new          (void);
+
+void                    hwangsae_recorder_set_container(HwangsaeRecorder * self,
+                                                        HwangsaeContainer container);
+HwangsaeContainer       hwangsae_recorder_get_container(HwangsaeRecorder * self);
 
 void                    hwangsae_recorder_start_recording
                                                        (HwangsaeRecorder * self,
