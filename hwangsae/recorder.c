@@ -147,26 +147,44 @@ hwangsae_recorder_start_recording (HwangsaeRecorder * self, const gchar * uri)
 {
   HwangsaeRecorderPrivate *priv = hwangsae_recorder_get_instance_private (self);
 
+  g_autoptr (GEnumClass) enum_class = NULL;
+  GEnumValue *container;
   g_autoptr (GstBus) bus = NULL;
   g_autoptr (GstElement) parse = NULL;
   g_autoptr (GstPad) parse_src = NULL;
   g_autofree gchar *recording_file = NULL;
   g_autofree gchar *pipeline_str = NULL;
+  const gchar *mux_name;
   g_autoptr (GError) error = NULL;
 
   g_return_if_fail (!priv->pipeline);
 
   g_mkdir_with_parents (priv->recording_dir, 0750);
 
+  enum_class = g_type_class_ref (HWANGSAE_TYPE_CONTAINER);
+  container = g_enum_get_value (enum_class, priv->container);
+
   recording_file = g_build_filename (priv->recording_dir,
-      "hwangsae-recording-%ld.mp4", NULL);
-  recording_file = g_strdup_printf (recording_file, g_get_real_time ());
+      "hwangsae-recording-%ld.%s", NULL);
+  recording_file = g_strdup_printf (recording_file, g_get_real_time (),
+      container->value_nick);
   priv->recording_file = g_steal_pointer (&recording_file);
+
+  switch (priv->container) {
+    case HWANGSAE_CONTAINER_MP4:
+      mux_name = "mp4mux";
+      break;
+    case HWANGSAE_CONTAINER_TS:
+      mux_name = "mpegtsmux";
+      break;
+    default:
+      g_error ("Unknown container format %s", container->value_nick);
+  }
 
   pipeline_str =
       g_strdup_printf
-      ("urisourcebin uri=%s name=srcbin ! tsdemux ! h264parse name=parse ! mp4mux ! filesink location=%s",
-      uri, priv->recording_file);
+      ("urisourcebin uri=%s name=srcbin ! tsdemux ! h264parse name=parse ! %s ! filesink location=%s",
+      uri, mux_name, priv->recording_file);
 
   priv->pipeline = gst_parse_launch (pipeline_str, &error);
 
