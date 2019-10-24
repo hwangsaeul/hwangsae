@@ -204,12 +204,106 @@ test_hwangsae_recorder_record (TestFixture * fixture, gconstpointer unused)
 
 const guint SEGMENT_LEN_SECONDS = 5;
 
+typedef struct
+{
+  GMainLoop *loop;
+  gboolean has_initial_segment;
+  GstClockTime gap_start;
+  GstClockTime gap_end;
+} CheckGapsData;
+
+static GstPadProbeReturn
+gap_probe_cb (GstPad * pad, GstPadProbeInfo * info, gpointer user_data)
+{
+  CheckGapsData *data = user_data;
+
+  if (GST_IS_EVENT (info->data)) {
+    GstEvent *event = GST_PAD_PROBE_INFO_EVENT (info);
+
+    switch (GST_EVENT_TYPE (event)) {
+      case GST_EVENT_SEGMENT:{
+        if (data->has_initial_segment) {
+          const GstSegment *segment;
+
+          gst_event_parse_segment (event, &segment);
+          g_debug ("Segment event at %" GST_TIME_FORMAT,
+              GST_TIME_ARGS (segment->position));
+
+          g_assert_cmpuint (data->gap_start, ==, GST_CLOCK_TIME_NONE);
+          data->gap_start = segment->position;
+        } else {
+          // Ignore the segment event at the beginning of the recording.
+          data->has_initial_segment = TRUE;
+        }
+        break;
+      }
+      case GST_EVENT_EOS:
+        g_main_loop_quit (data->loop);
+        break;
+      default:
+        break;
+    }
+  } else if (GST_IS_BUFFER (info->data)) {
+    if (data->gap_start != GST_CLOCK_TIME_NONE &&
+        data->gap_end == GST_CLOCK_TIME_NONE) {
+      GstBuffer *buffer = GST_PAD_PROBE_INFO_BUFFER (info);
+      data->gap_end = GST_BUFFER_PTS (buffer);
+    }
+  }
+
+  return GST_PAD_PROBE_OK;
+}
+
+static GstClockTimeDiff
+get_gap_duration (const gchar * file_path)
+{
+  g_autoptr (GMainContext) context = g_main_context_new ();
+  g_autoptr (GMainLoop) loop = g_main_loop_new (context, FALSE);
+  g_autoptr (GstElement) pipeline = NULL;
+  g_autoptr (GstElement) sink = NULL;
+  g_autoptr (GstPad) pad = NULL;
+  g_autofree gchar *pipeline_str = NULL;
+  CheckGapsData data = { 0 };
+  g_autoptr (GError) error = NULL;
+
+  g_main_context_push_thread_default (context);
+
+  pipeline_str =
+      g_strdup_printf ("filesrc location=%s ! decodebin ! fakesink name=sink",
+      file_path);
+
+  pipeline = gst_parse_launch (pipeline_str, &error);
+  g_assert_no_error (error);
+
+  sink = gst_bin_get_by_name (GST_BIN (pipeline), "sink");
+  g_assert_nonnull (sink);
+  pad = gst_element_get_static_pad (sink, "sink");
+  g_assert_nonnull (pad);
+
+  data.loop = loop;
+  data.gap_start = data.gap_end = GST_CLOCK_TIME_NONE;
+  gst_pad_add_probe (pad, GST_PAD_PROBE_TYPE_DATA_DOWNSTREAM, gap_probe_cb,
+      &data, NULL);
+
+  gst_element_set_state (pipeline, GST_STATE_PLAYING);
+
+  g_main_loop_run (loop);
+
+  gst_element_set_state (pipeline, GST_STATE_NULL);
+
+  g_main_context_pop_thread_default (context);
+
+  return GST_CLOCK_DIFF (data.gap_start, data.gap_end);
+}
+
 static void
 recording_done_cb (HwangsaeRecorder * recorder, const gchar * file_path,
     TestFixture * fixture)
 {
   GstClockTime duration;
+  GstClockTimeDiff gap;
   const GstClockTime expected_duration = 3 * SEGMENT_LEN_SECONDS * GST_SECOND;
+  const GstClockTime expected_gap = SEGMENT_LEN_SECONDS * GST_SECOND;
 
   gaeguli_pipeline_stop (fixture->pipeline);
   stop_streaming (fixture);
@@ -221,6 +315,12 @@ recording_done_cb (HwangsaeRecorder * recorder, const gchar * file_path,
 
   g_assert_cmpint (labs (GST_CLOCK_DIFF (duration, expected_duration)), <=,
       GST_SECOND);
+
+  gap = get_gap_duration (file_path);
+
+  g_debug ("Gap in the file lasts %" GST_STIME_FORMAT, GST_STIME_ARGS (gap));
+
+  g_assert_cmpint (labs (GST_CLOCK_DIFF (gap, expected_gap)), <=, GST_SECOND);
 
   g_main_loop_quit (fixture->loop);
 }
