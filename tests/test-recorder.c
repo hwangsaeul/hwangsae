@@ -117,6 +117,7 @@ get_file_duration (const gchar * file_path)
   g_autoptr (GstCaps) stream_caps = NULL;
   g_autofree gchar *stream_caps_str = NULL;
   g_autofree gchar *uri = NULL;
+  const gchar *container_type;
 
   discoverer = gst_discoverer_new (5 * GST_SECOND, &error);
   g_assert_no_error (error);
@@ -135,9 +136,18 @@ get_file_duration (const gchar * file_path)
   g_debug ("Container file has caps: %s", stream_caps_str);
 
   g_assert_cmpint (gst_caps_get_size (stream_caps), ==, 1);
+
+  if (g_str_has_suffix (file_path, ".mp4")) {
+    container_type = "video/quicktime";
+  } else if (g_str_has_suffix (file_path, ".ts")) {
+    container_type = "video/mpegts";
+  } else {
+    g_assert_not_reached ();
+  }
+
   g_assert_cmpstr
       (gst_structure_get_name (gst_caps_get_structure (stream_caps, 0)), ==,
-      "video/quicktime");
+      container_type);
 
   return gst_discoverer_info_get_duration (info);
 }
@@ -184,9 +194,12 @@ stream_disconnected_cb (HwangsaeRecorder * recorder, TestFixture * fixture)
 }
 
 static void
-test_hwangsae_recorder_record (TestFixture * fixture, gconstpointer unused)
+test_hwangsae_recorder_record (TestFixture * fixture, gconstpointer data)
 {
+  HwangsaeContainer container = GPOINTER_TO_INT (data);
   g_autoptr (GError) error = NULL;
+
+  hwangsae_recorder_set_container (fixture->recorder, container);
 
   g_signal_connect (fixture->recorder, "stream-connected",
       (GCallback) stream_connected_cb, fixture);
@@ -389,8 +402,12 @@ main (int argc, char *argv[])
   /* Don't treat warnings as fatal, which is GTest default. */
   g_log_set_always_fatal (G_LOG_FATAL_MASK | G_LOG_LEVEL_CRITICAL);
 
-  g_test_add ("/hwangsae/recorder-record",
-      TestFixture, NULL, fixture_setup,
+  g_test_add ("/hwangsae/recorder-record-mp4",
+      TestFixture, GUINT_TO_POINTER (HWANGSAE_CONTAINER_MP4), fixture_setup,
+      test_hwangsae_recorder_record, fixture_teardown);
+
+  g_test_add ("/hwangsae/recorder-record-ts",
+      TestFixture, GUINT_TO_POINTER (HWANGSAE_CONTAINER_TS), fixture_setup,
       test_hwangsae_recorder_record, fixture_teardown);
 
   g_test_add ("/hwangsae/recorder-disconnect",
