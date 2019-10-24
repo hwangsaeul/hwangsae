@@ -18,6 +18,8 @@
 
 #include "recorder.h"
 
+#include "enumtypes.h"
+
 #include <gio/gio.h>
 #include <gst/gst.h>
 
@@ -34,6 +36,7 @@ typedef struct
   gchar *recording_file;
 
   gchar *recording_dir;
+  HwangsaeContainer container;
 } HwangsaeRecorderPrivate;
 
 /* *INDENT-OFF* */
@@ -43,6 +46,7 @@ G_DEFINE_TYPE_WITH_PRIVATE (HwangsaeRecorder, hwangsae_recorder, G_TYPE_OBJECT)
 enum
 {
   PROP_RECORDING_DIR = 1,
+  PROP_CONTAINER,
   PROP_LAST
 };
 
@@ -61,6 +65,23 @@ HwangsaeRecorder *
 hwangsae_recorder_new (void)
 {
   return g_object_new (HWANGSAE_TYPE_RECORDER, NULL);
+}
+
+void
+hwangsae_recorder_set_container (HwangsaeRecorder * self,
+    HwangsaeContainer container)
+{
+  g_object_set (self, "container", container, NULL);
+}
+
+HwangsaeContainer
+hwangsae_recorder_get_container (HwangsaeRecorder * self)
+{
+  HwangsaeContainer result;
+
+  g_object_get (self, "container", &result, NULL);
+
+  return result;
 }
 
 static void
@@ -189,7 +210,9 @@ hwangsae_recorder_set_property (GObject * object, guint property_id,
       g_clear_pointer (&priv->recording_dir, g_free);
       priv->recording_dir = g_strdup (g_value_get_string (value));
       break;
-
+    case PROP_CONTAINER:
+      priv->container = g_value_get_enum (value);
+      break;
     default:
       G_OBJECT_WARN_INVALID_PROPERTY_ID (object, property_id, pspec);
   }
@@ -206,7 +229,9 @@ hwangsae_recorder_get_property (GObject * object, guint property_id,
     case PROP_RECORDING_DIR:
       g_value_set_string (value, priv->recording_dir);
       break;
-
+    case PROP_CONTAINER:
+      g_value_set_enum (value, priv->container);
+      break;
     default:
       G_OBJECT_WARN_INVALID_PROPERTY_ID (object, property_id, pspec);
   }
@@ -223,6 +248,12 @@ hwangsae_recorder_class_init (HwangsaeRecorderClass * klass)
   g_object_class_install_property (gobject_class, PROP_RECORDING_DIR,
       g_param_spec_string ("recording-dir", "Recording directory",
           "Recording directory", NULL,
+          G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS));
+
+  g_object_class_install_property (gobject_class, PROP_CONTAINER,
+      g_param_spec_enum ("container", "Media container",
+          "Media container format of the recording file",
+          HWANGSAE_TYPE_CONTAINER, HWANGSAE_CONTAINER_MP4,
           G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS));
 
   signals[STREAM_CONNECTED_SIGNAL] =

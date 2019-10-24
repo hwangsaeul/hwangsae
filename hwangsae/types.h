@@ -30,4 +30,9 @@ typedef enum {
   HWANGSAE_RETURN_OK,
 } HwangsaeReturn;
 
+typedef enum {
+  HWANGSAE_CONTAINER_MP4,
+  HWANGSAE_CONTAINER_TS,
+} HwangsaeContainer;
+
 #endif // __HWANGSAE_TYPES_H__
