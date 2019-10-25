@@ -48,6 +48,8 @@ fixture_setup (TestFixture * fixture, gconstpointer unused)
   fixture->recorder = hwangsae_recorder_new ();
   g_object_set (fixture->recorder, "recording-dir", "/tmp", NULL);
 
+  g_object_set (fixture->pipeline, "clock-overlay", TRUE, NULL);
+
   gaeguli_pipeline_add_fifo_target_full (fixture->pipeline,
       GAEGULI_VIDEO_CODEC_H264, GAEGULI_VIDEO_RESOLUTION_640x480,
       gaeguli_fifo_transmit_get_fifo (fixture->transmit), &error);
