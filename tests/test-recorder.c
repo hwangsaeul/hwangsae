@@ -154,6 +154,13 @@ get_file_duration (const gchar * file_path)
 
 // recorder-record -------------------------------------------------------------
 
+typedef struct
+{
+  TestFixture *fixture;
+  gboolean got_file_created_signal;
+  gboolean got_file_completed_signal;
+} RecorderTestData;
+
 static gboolean
 stop_recording_timeout_cb (TestFixture * fixture)
 {
@@ -170,8 +177,18 @@ stream_connected_cb (HwangsaeRecorder * recorder, TestFixture * fixture)
 }
 
 static void
+file_created_cb (HwangsaeRecorder * recorder, const gchar * file_path,
+    RecorderTestData * data)
+{
+  g_debug ("File %s created", file_path);
+
+  g_assert_false (data->got_file_created_signal);
+  data->got_file_created_signal = TRUE;
+}
+
+static void
 file_completed_cb (HwangsaeRecorder * recorder, const gchar * file_path,
-    TestFixture * fixture)
+    RecorderTestData * data)
 {
   GstClockTime duration = get_file_duration (file_path);
 
@@ -180,6 +197,9 @@ file_completed_cb (HwangsaeRecorder * recorder, const gchar * file_path,
 
   g_assert_cmpint (labs (GST_CLOCK_DIFF (duration, 5 * GST_SECOND)), <=,
       GST_SECOND);
+
+  g_assert_false (data->got_file_completed_signal);
+  data->got_file_completed_signal = TRUE;
 }
 
 static void
@@ -197,14 +217,19 @@ static void
 test_hwangsae_recorder_record (TestFixture * fixture, gconstpointer data)
 {
   HwangsaeContainer container = GPOINTER_TO_INT (data);
+  RecorderTestData test_data = { 0 };
   g_autoptr (GError) error = NULL;
+
+  test_data.fixture = fixture;
 
   hwangsae_recorder_set_container (fixture->recorder, container);
 
   g_signal_connect (fixture->recorder, "stream-connected",
       (GCallback) stream_connected_cb, fixture);
+  g_signal_connect (fixture->recorder, "file-created",
+      (GCallback) file_created_cb, &test_data);
   g_signal_connect (fixture->recorder, "file-completed",
-      (GCallback) file_completed_cb, fixture);
+      (GCallback) file_completed_cb, &test_data);
   g_signal_connect (fixture->recorder, "stream-disconnected",
       (GCallback) stream_disconnected_cb, fixture);
 
@@ -213,6 +238,9 @@ test_hwangsae_recorder_record (TestFixture * fixture, gconstpointer data)
   hwangsae_recorder_start_recording (fixture->recorder, "srt://127.0.0.1:8888");
 
   g_main_loop_run (fixture->loop);
+
+  g_assert_true (test_data.got_file_created_signal);
+  g_assert_true (test_data.got_file_completed_signal);
 }
 
 // recorder-disconnect ---------------------------------------------------------
