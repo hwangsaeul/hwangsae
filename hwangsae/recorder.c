@@ -39,7 +39,8 @@ typedef struct
   GSettings *settings;
   GstElement *pipeline;
 
-  gchar *recording_file;
+  gchar *filename_template;
+  gchar *filename;
 
   gchar *recording_dir;
   HwangsaeContainer container;
@@ -98,8 +99,9 @@ hwangsae_recorder_stop_recording_internal (HwangsaeRecorder * self)
   gst_element_set_state (priv->pipeline, GST_STATE_NULL);
   g_clear_pointer (&priv->pipeline, gst_object_unref);
 
-  g_signal_emit (self, signals[FILE_COMPLETED_SIGNAL], 0, priv->recording_file);
-  g_clear_pointer (&priv->recording_file, g_free);
+  g_signal_emit (self, signals[FILE_COMPLETED_SIGNAL], 0, priv->filename);
+  g_clear_pointer (&priv->filename_template, g_free);
+  g_clear_pointer (&priv->filename, g_free);
 
   g_signal_emit (self, signals[STREAM_DISCONNECTED_SIGNAL], 0);
 
@@ -148,6 +150,22 @@ first_buffer_cb (GstPad * pad, GstPadProbeInfo * info, gpointer data)
   return GST_PAD_PROBE_REMOVE;
 }
 
+static gchar *
+hwangsae_recorder_handle_new_file (HwangsaeRecorder * self, guint fragment_id)
+{
+  HwangsaeRecorderPrivate *priv = hwangsae_recorder_get_instance_private (self);
+
+  if (priv->filename) {
+    g_signal_emit (self, signals[FILE_COMPLETED_SIGNAL], 0, priv->filename);
+    g_clear_pointer (&priv->filename, g_free);
+  }
+
+  priv->filename = g_strdup_printf (priv->filename_template, fragment_id);
+  g_signal_emit (self, signals[FILE_CREATED_SIGNAL], 0, priv->filename);
+
+  return g_strdup (priv->filename);
+}
+
 void
 hwangsae_recorder_start_recording (HwangsaeRecorder * self, const gchar * uri)
 {
@@ -156,7 +174,7 @@ hwangsae_recorder_start_recording (HwangsaeRecorder * self, const gchar * uri)
   g_autoptr (GEnumClass) enum_class = NULL;
   GEnumValue *container;
   g_autoptr (GstBus) bus = NULL;
-  g_autoptr (GstElement) parse = NULL;
+  g_autoptr (GstElement) element = NULL;
   g_autoptr (GstPad) parse_src = NULL;
   g_autofree gchar *recording_file = NULL;
   g_autofree gchar *pipeline_str = NULL;
@@ -171,10 +189,10 @@ hwangsae_recorder_start_recording (HwangsaeRecorder * self, const gchar * uri)
   container = g_enum_get_value (enum_class, priv->container);
 
   recording_file = g_build_filename (priv->recording_dir,
-      "hwangsae-recording-%ld.%s", NULL);
+      "hwangsae-recording-%ld-%%05d.%s", NULL);
   recording_file = g_strdup_printf (recording_file, g_get_real_time (),
       container->value_nick);
-  priv->recording_file = g_steal_pointer (&recording_file);
+  priv->filename_template = g_steal_pointer (&recording_file);
 
   switch (priv->container) {
     case HWANGSAE_CONTAINER_MP4:
@@ -189,23 +207,26 @@ hwangsae_recorder_start_recording (HwangsaeRecorder * self, const gchar * uri)
 
   pipeline_str =
       g_strdup_printf
-      ("urisourcebin uri=%s name=srcbin ! tsdemux ! h264parse name=parse ! %s ! filesink location=%s",
-      uri, mux_name, priv->recording_file);
+      ("urisourcebin uri=%s name=srcbin ! tsdemux ! h264parse name=parse ! "
+      "splitmuxsink name=sink async-finalize=true muxer-factory=%s",
+      uri, mux_name);
 
   priv->pipeline = gst_parse_launch (pipeline_str, &error);
 
   bus = gst_element_get_bus (priv->pipeline);
   gst_bus_add_watch (bus, gst_bus_cb, self);
 
-  parse = gst_bin_get_by_name (GST_BIN (priv->pipeline), "parse");
-  parse_src = gst_element_get_static_pad (parse, "src");
+  element = gst_bin_get_by_name (GST_BIN (priv->pipeline), "parse");
+  parse_src = gst_element_get_static_pad (element, "src");
   gst_pad_add_probe (parse_src,
       GST_PAD_PROBE_TYPE_BUFFER | GST_PAD_PROBE_TYPE_BUFFER_LIST,
       first_buffer_cb, bus, NULL);
 
-  gst_element_set_state (priv->pipeline, GST_STATE_PLAYING);
+  element = gst_bin_get_by_name (GST_BIN (priv->pipeline), "sink");
+  g_signal_connect_swapped (element, "format-location",
+      (GCallback) hwangsae_recorder_handle_new_file, self);
 
-  g_signal_emit (self, signals[FILE_CREATED_SIGNAL], 0, priv->recording_file);
+  gst_element_set_state (priv->pipeline, GST_STATE_PLAYING);
 }
 
 void
