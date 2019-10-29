@@ -44,6 +44,7 @@ typedef struct
 
   gchar *recording_dir;
   HwangsaeContainer container;
+  guint64 max_size_time;
 } HwangsaeRecorderPrivate;
 
 /* *INDENT-OFF* */
@@ -54,6 +55,7 @@ enum
 {
   PROP_RECORDING_DIR = 1,
   PROP_CONTAINER,
+  PROP_MAX_SIZE_TIME,
   PROP_LAST
 };
 
@@ -87,6 +89,23 @@ hwangsae_recorder_get_container (HwangsaeRecorder * self)
   HwangsaeContainer result;
 
   g_object_get (self, "container", &result, NULL);
+
+  return result;
+}
+
+void
+hwangsae_recorder_set_max_size_time (HwangsaeRecorder * self,
+    guint64 duration_ns)
+{
+  g_object_set (self, "max-size-time", duration_ns, NULL);
+}
+
+guint64
+hwangsae_recorder_get_max_size_time (HwangsaeRecorder * self)
+{
+  guint64 result;
+
+  g_object_get (self, "max-size-time", &result, NULL);
 
   return result;
 }
@@ -223,6 +242,7 @@ hwangsae_recorder_start_recording (HwangsaeRecorder * self, const gchar * uri)
       first_buffer_cb, bus, NULL);
 
   element = gst_bin_get_by_name (GST_BIN (priv->pipeline), "sink");
+  g_object_set (element, "max-size-time", priv->max_size_time, NULL);
   g_signal_connect_swapped (element, "format-location",
       (GCallback) hwangsae_recorder_handle_new_file, self);
 
@@ -258,6 +278,9 @@ hwangsae_recorder_set_property (GObject * object, guint property_id,
     case PROP_CONTAINER:
       priv->container = g_value_get_enum (value);
       break;
+    case PROP_MAX_SIZE_TIME:
+      priv->max_size_time = g_value_get_uint64 (value);
+      break;
     default:
       G_OBJECT_WARN_INVALID_PROPERTY_ID (object, property_id, pspec);
   }
@@ -276,6 +299,9 @@ hwangsae_recorder_get_property (GObject * object, guint property_id,
       break;
     case PROP_CONTAINER:
       g_value_set_enum (value, priv->container);
+      break;
+    case PROP_MAX_SIZE_TIME:
+      g_value_set_uint64 (value, priv->max_size_time);
       break;
     default:
       G_OBJECT_WARN_INVALID_PROPERTY_ID (object, property_id, pspec);
@@ -300,6 +326,11 @@ hwangsae_recorder_class_init (HwangsaeRecorderClass * klass)
           "Media container format of the recording file",
           HWANGSAE_TYPE_CONTAINER, HWANGSAE_CONTAINER_MP4,
           G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS));
+
+  g_object_class_install_property (gobject_class, PROP_MAX_SIZE_TIME,
+      g_param_spec_uint64 ("max-size-time", "Max recording file duration",
+          "Max amount of time per recording file (in ns, 0 = disable)",
+          0, G_MAXUINT64, 0, G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS));
 
   signals[STREAM_CONNECTED_SIGNAL] =
       g_signal_new ("stream-connected", G_TYPE_FROM_CLASS (klass),
