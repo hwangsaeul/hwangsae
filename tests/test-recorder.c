@@ -423,17 +423,17 @@ test_hwangsae_recorder_disconnect (TestFixture * fixture, gconstpointer unused)
   g_main_loop_run (fixture->loop);
 }
 
-// recorder-split-time ---------------------------------------------------------
+// recorder-split --------------------------------------------------------------
 
 typedef struct
 {
   GSList *filenames;
   guint file_created_signal_count;
   guint file_completed_signal_count;
-} SplitTimeData;
+} SplitData;
 
 static gboolean
-split_time_stop_recording (TestFixture * fixture)
+split_stop_recording (TestFixture * fixture)
 {
   hwangsae_recorder_stop_recording (fixture->recorder);
 
@@ -441,19 +441,18 @@ split_time_stop_recording (TestFixture * fixture)
 }
 
 static void
-spit_time_stream_connected_cb (HwangsaeRecorder * recorder,
-    TestFixture * fixture)
+spit_stream_connected_cb (HwangsaeRecorder * recorder, TestFixture * fixture)
 {
   /* We want to record 3 files split after each 5 seconds. Stop the recording
    * well before 15 seconds passes, otherwise we may end up with 4 files if
    * recorder stops e.g. at 15.1 s. The final segment will therefore be shorter.
    */
-  g_timeout_add_seconds (13, (GSourceFunc) split_time_stop_recording, fixture);
+  g_timeout_add_seconds (13, (GSourceFunc) split_stop_recording, fixture);
 }
 
 static void
-split_time_file_created_cb (HwangsaeRecorder * recorder,
-    const gchar * file_path, SplitTimeData * data)
+split_file_created_cb (HwangsaeRecorder * recorder,
+    const gchar * file_path, SplitData * data)
 {
   g_debug ("Created file %s", file_path);
 
@@ -462,8 +461,8 @@ split_time_file_created_cb (HwangsaeRecorder * recorder,
 }
 
 static void
-split_time_file_completed_cb (HwangsaeRecorder * recorder,
-    const gchar * file_path, SplitTimeData * data)
+split_file_completed_cb (HwangsaeRecorder * recorder,
+    const gchar * file_path, SplitData * data)
 {
   g_debug ("Completed file %s", file_path);
 
@@ -471,24 +470,22 @@ split_time_file_completed_cb (HwangsaeRecorder * recorder,
   ++data->file_completed_signal_count;
 }
 
-static void
-test_hwangsae_recorder_split_time (TestFixture * fixture, gconstpointer unused)
+static GSList *
+split_run_test (TestFixture * fixture)
 {
-  SplitTimeData data = { 0 };
-  guint i;
+  SplitData data = { 0 };
 
   g_signal_connect (fixture->recorder, "stream-connected",
-      (GCallback) spit_time_stream_connected_cb, fixture);
+      (GCallback) spit_stream_connected_cb, fixture);
   g_signal_connect (fixture->recorder, "file-created",
-      (GCallback) split_time_file_created_cb, &data);
+      (GCallback) split_file_created_cb, &data);
   g_signal_connect (fixture->recorder, "file-completed",
-      (GCallback) split_time_file_completed_cb, &data);
+      (GCallback) split_file_completed_cb, &data);
   g_signal_connect (fixture->recorder, "stream-disconnected",
       (GCallback) stream_disconnected_cb, fixture);
 
   start_streaming (fixture);
 
-  hwangsae_recorder_set_max_size_time (fixture->recorder, 5 * GST_SECOND);
   hwangsae_recorder_start_recording (fixture->recorder, "srt://127.0.0.1:8888");
 
   g_main_loop_run (fixture->loop);
@@ -497,8 +494,21 @@ test_hwangsae_recorder_split_time (TestFixture * fixture, gconstpointer unused)
   g_assert_cmpint (data.file_completed_signal_count, ==, 3);
   g_assert_cmpint (g_slist_length (data.filenames), ==, 3);
 
+  return data.filenames;
+}
+
+static void
+test_hwangsae_recorder_split_time (TestFixture * fixture, gconstpointer unused)
+{
+  guint i;
+  GSList *filenames;
+
+  hwangsae_recorder_set_max_size_time (fixture->recorder, 5 * GST_SECOND);
+
+  filenames = split_run_test (fixture);
+
   for (i = 0; i != 3; ++i) {
-    const gchar *filename = g_slist_nth_data (data.filenames, i);
+    const gchar *filename = g_slist_nth_data (filenames, i);
     GstClockTime duration = get_file_duration (filename);
 
     g_debug ("%s has duration %" GST_TIME_FORMAT, filename,
@@ -513,7 +523,7 @@ test_hwangsae_recorder_split_time (TestFixture * fixture, gconstpointer unused)
     }
   }
 
-  g_slist_free_full (data.filenames, g_free);
+  g_slist_free_full (filenames, g_free);
 }
 
 int
