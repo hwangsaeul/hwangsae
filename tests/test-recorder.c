@@ -425,30 +425,14 @@ test_hwangsae_recorder_disconnect (TestFixture * fixture, gconstpointer unused)
 
 // recorder-split --------------------------------------------------------------
 
+const guint NUM_FILE_SEGMENTS = 3;
+
 typedef struct
 {
   GSList *filenames;
   guint file_created_signal_count;
   guint file_completed_signal_count;
 } SplitData;
-
-static gboolean
-split_stop_recording (TestFixture * fixture)
-{
-  hwangsae_recorder_stop_recording (fixture->recorder);
-
-  return G_SOURCE_REMOVE;
-}
-
-static void
-spit_stream_connected_cb (HwangsaeRecorder * recorder, TestFixture * fixture)
-{
-  /* We want to record 3 files split after each 5 seconds. Stop the recording
-   * well before 15 seconds passes, otherwise we may end up with 4 files if
-   * recorder stops e.g. at 15.1 s. The final segment will therefore be shorter.
-   */
-  g_timeout_add_seconds (13, (GSourceFunc) split_stop_recording, fixture);
-}
 
 static void
 split_file_created_cb (HwangsaeRecorder * recorder,
@@ -457,7 +441,9 @@ split_file_created_cb (HwangsaeRecorder * recorder,
   g_debug ("Created file %s", file_path);
 
   data->filenames = g_slist_append (data->filenames, g_strdup (file_path));
-  ++data->file_created_signal_count;
+  if (++data->file_created_signal_count == NUM_FILE_SEGMENTS) {
+    hwangsae_recorder_stop_recording (recorder);
+  }
 }
 
 static void
@@ -466,7 +452,6 @@ split_file_completed_cb (HwangsaeRecorder * recorder,
 {
   g_debug ("Completed file %s", file_path);
 
-  g_assert_cmpstr (g_slist_last (data->filenames)->data, ==, file_path);
   ++data->file_completed_signal_count;
 }
 
@@ -475,8 +460,6 @@ split_run_test (TestFixture * fixture)
 {
   SplitData data = { 0 };
 
-  g_signal_connect (fixture->recorder, "stream-connected",
-      (GCallback) spit_stream_connected_cb, fixture);
   g_signal_connect (fixture->recorder, "file-created",
       (GCallback) split_file_created_cb, &data);
   g_signal_connect (fixture->recorder, "file-completed",
@@ -490,9 +473,10 @@ split_run_test (TestFixture * fixture)
 
   g_main_loop_run (fixture->loop);
 
-  g_assert_cmpint (data.file_created_signal_count, ==, 3);
-  g_assert_cmpint (data.file_completed_signal_count, ==, 3);
-  g_assert_cmpint (g_slist_length (data.filenames), ==, 3);
+  g_assert_cmpint (data.file_created_signal_count, >=, NUM_FILE_SEGMENTS);
+  g_assert_cmpint (data.file_completed_signal_count, ==,
+      data.file_created_signal_count);
+  g_assert_cmpint (g_slist_length (data.filenames), >=, NUM_FILE_SEGMENTS);
 
   return data.filenames;
 }
@@ -500,30 +484,28 @@ split_run_test (TestFixture * fixture)
 static void
 test_hwangsae_recorder_split_time (TestFixture * fixture, gconstpointer unused)
 {
-  guint i;
   GSList *filenames;
+  const GstClockTimeDiff FILE_SEGMENT_LEN = 5 * GST_SECOND;
 
-  hwangsae_recorder_set_max_size_time (fixture->recorder, 5 * GST_SECOND);
+  hwangsae_recorder_set_max_size_time (fixture->recorder, FILE_SEGMENT_LEN);
 
   filenames = split_run_test (fixture);
 
-  for (i = 0; i != 3; ++i) {
-    const gchar *filename = g_slist_nth_data (filenames, i);
+  for (; filenames; filenames = g_slist_delete_link (filenames, filenames)) {
+    g_autofree gchar *filename = filenames->data;
     GstClockTime duration = get_file_duration (filename);
 
     g_debug ("%s has duration %" GST_TIME_FORMAT, filename,
         GST_TIME_ARGS (duration));
 
-    if (i < 2) {
-      g_assert_cmpint (labs (GST_CLOCK_DIFF (duration, 5 * GST_SECOND)), <=,
+    if (filenames->next) {
+      g_assert_cmpint (labs (GST_CLOCK_DIFF (duration, FILE_SEGMENT_LEN)), <=,
           GST_SECOND);
     } else {
-      /* The final segment should be shorter than 5 seconds. */
-      g_assert_cmpint (duration, <, 5 * GST_SECOND);
+      /* The final segment should be shorter than FILE_SEGMENT_LEN. */
+      g_assert_cmpint (duration, <, FILE_SEGMENT_LEN);
     }
   }
-
-  g_slist_free_full (filenames, g_free);
 }
 
 int
