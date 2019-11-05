@@ -127,27 +127,23 @@ hwangsae_recorder_stop_recording_internal (HwangsaeRecorder * self)
   g_debug ("Recording stopped");
 }
 
-static void
-hwangsae_recorder_emit_stream_connected (HwangsaeRecorder * self)
-{
-  g_signal_emit (self, signals[STREAM_CONNECTED_SIGNAL], 0);
-}
-
 static gboolean
 gst_bus_cb (GstBus * bus, GstMessage * message, gpointer data)
 {
+  HwangsaeRecorder *recorder = HWANGSAE_RECORDER (data);
+
   switch (message->type) {
     case GST_MESSAGE_APPLICATION:{
       const gchar *name =
           gst_structure_get_name (gst_message_get_structure (message));
 
       if (g_str_equal (name, "hwangsae-recorder-first-frame")) {
-        hwangsae_recorder_emit_stream_connected (HWANGSAE_RECORDER (data));
+        g_signal_emit (recorder, signals[STREAM_CONNECTED_SIGNAL], 0);
       }
       break;
     }
     case GST_MESSAGE_EOS:
-      hwangsae_recorder_stop_recording_internal (HWANGSAE_RECORDER (data));
+      hwangsae_recorder_stop_recording_internal (recorder);
       break;
     default:
       break;
