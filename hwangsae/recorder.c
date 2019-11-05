@@ -39,9 +39,6 @@ typedef struct
   GSettings *settings;
   GstElement *pipeline;
 
-  gchar *filename_template;
-  gchar *filename;
-
   gchar *recording_dir;
   HwangsaeContainer container;
   guint64 max_size_time;
@@ -118,10 +115,6 @@ hwangsae_recorder_stop_recording_internal (HwangsaeRecorder * self)
   gst_element_set_state (priv->pipeline, GST_STATE_NULL);
   g_clear_pointer (&priv->pipeline, gst_object_unref);
 
-  g_signal_emit (self, signals[FILE_COMPLETED_SIGNAL], 0, priv->filename);
-  g_clear_pointer (&priv->filename_template, g_free);
-  g_clear_pointer (&priv->filename, g_free);
-
   g_signal_emit (self, signals[STREAM_DISCONNECTED_SIGNAL], 0);
 
   g_debug ("Recording stopped");
@@ -139,6 +132,18 @@ gst_bus_cb (GstBus * bus, GstMessage * message, gpointer data)
 
       if (g_str_equal (name, "hwangsae-recorder-first-frame")) {
         g_signal_emit (recorder, signals[STREAM_CONNECTED_SIGNAL], 0);
+      }
+      break;
+    }
+    case GST_MESSAGE_ELEMENT:{
+      const GstStructure *s = gst_message_get_structure (message);
+
+      if (gst_structure_has_name (s, "splitmuxsink-fragment-opened")) {
+        g_signal_emit (recorder, signals[FILE_CREATED_SIGNAL], 0,
+            gst_structure_get_string (s, "location"));
+      } else if (gst_structure_has_name (s, "splitmuxsink-fragment-closed")) {
+        g_signal_emit (recorder, signals[FILE_COMPLETED_SIGNAL], 0,
+            gst_structure_get_string (s, "location"));
       }
       break;
     }
@@ -163,22 +168,6 @@ first_buffer_cb (GstPad * pad, GstPadProbeInfo * info, gpointer data)
           gst_structure_new_empty ("hwangsae-recorder-first-frame")));
 
   return GST_PAD_PROBE_REMOVE;
-}
-
-static gchar *
-hwangsae_recorder_handle_new_file (HwangsaeRecorder * self, guint fragment_id)
-{
-  HwangsaeRecorderPrivate *priv = hwangsae_recorder_get_instance_private (self);
-
-  if (priv->filename) {
-    g_signal_emit (self, signals[FILE_COMPLETED_SIGNAL], 0, priv->filename);
-    g_clear_pointer (&priv->filename, g_free);
-  }
-
-  priv->filename = g_strdup_printf (priv->filename_template, fragment_id);
-  g_signal_emit (self, signals[FILE_CREATED_SIGNAL], 0, priv->filename);
-
-  return g_strdup (priv->filename);
 }
 
 void
@@ -207,7 +196,6 @@ hwangsae_recorder_start_recording (HwangsaeRecorder * self, const gchar * uri)
       "hwangsae-recording-%ld-%%05d.%s", NULL);
   recording_file = g_strdup_printf (recording_file, g_get_real_time (),
       container->value_nick);
-  priv->filename_template = g_steal_pointer (&recording_file);
 
   switch (priv->container) {
     case HWANGSAE_CONTAINER_MP4:
@@ -238,9 +226,8 @@ hwangsae_recorder_start_recording (HwangsaeRecorder * self, const gchar * uri)
       first_buffer_cb, bus, NULL);
 
   element = gst_bin_get_by_name (GST_BIN (priv->pipeline), "sink");
-  g_object_set (element, "max-size-time", priv->max_size_time, NULL);
-  g_signal_connect_swapped (element, "format-location",
-      (GCallback) hwangsae_recorder_handle_new_file, self);
+  g_object_set (element,
+      "location", recording_file, "max-size-time", priv->max_size_time, NULL);
 
   gst_element_set_state (priv->pipeline, GST_STATE_PLAYING);
 }
