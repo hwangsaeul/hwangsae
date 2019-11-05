@@ -42,6 +42,7 @@ typedef struct
   gchar *recording_dir;
   HwangsaeContainer container;
   guint64 max_size_time;
+  guint64 max_size_bytes;
 } HwangsaeRecorderPrivate;
 
 /* *INDENT-OFF* */
@@ -53,6 +54,7 @@ enum
   PROP_RECORDING_DIR = 1,
   PROP_CONTAINER,
   PROP_MAX_SIZE_TIME,
+  PROP_MAX_SIZE_BYTES,
   PROP_LAST
 };
 
@@ -103,6 +105,22 @@ hwangsae_recorder_get_max_size_time (HwangsaeRecorder * self)
   guint64 result;
 
   g_object_get (self, "max-size-time", &result, NULL);
+
+  return result;
+}
+
+void
+hwangsae_recorder_set_max_size_bytes (HwangsaeRecorder * self, guint64 size)
+{
+  g_object_set (self, "max-size-bytes", size, NULL);
+}
+
+guint64
+hwangsae_recorder_get_max_size_bytes (HwangsaeRecorder * self)
+{
+  guint64 result;
+
+  g_object_get (self, "max-size-bytes", &result, NULL);
 
   return result;
 }
@@ -227,7 +245,9 @@ hwangsae_recorder_start_recording (HwangsaeRecorder * self, const gchar * uri)
 
   element = gst_bin_get_by_name (GST_BIN (priv->pipeline), "sink");
   g_object_set (element,
-      "location", recording_file, "max-size-time", priv->max_size_time, NULL);
+      "location", recording_file,
+      "max-size-time", priv->max_size_time,
+      "max-size-bytes", priv->max_size_bytes, NULL);
 
   gst_element_set_state (priv->pipeline, GST_STATE_PLAYING);
 }
@@ -264,6 +284,9 @@ hwangsae_recorder_set_property (GObject * object, guint property_id,
     case PROP_MAX_SIZE_TIME:
       priv->max_size_time = g_value_get_uint64 (value);
       break;
+    case PROP_MAX_SIZE_BYTES:
+      priv->max_size_bytes = g_value_get_uint64 (value);
+      break;
     default:
       G_OBJECT_WARN_INVALID_PROPERTY_ID (object, property_id, pspec);
   }
@@ -285,6 +308,9 @@ hwangsae_recorder_get_property (GObject * object, guint property_id,
       break;
     case PROP_MAX_SIZE_TIME:
       g_value_set_uint64 (value, priv->max_size_time);
+      break;
+    case PROP_MAX_SIZE_BYTES:
+      g_value_set_uint64 (value, priv->max_size_bytes);
       break;
     default:
       G_OBJECT_WARN_INVALID_PROPERTY_ID (object, property_id, pspec);
@@ -313,6 +339,11 @@ hwangsae_recorder_class_init (HwangsaeRecorderClass * klass)
   g_object_class_install_property (gobject_class, PROP_MAX_SIZE_TIME,
       g_param_spec_uint64 ("max-size-time", "Max recording file duration",
           "Max amount of time per recording file (in ns, 0 = disable)",
+          0, G_MAXUINT64, 0, G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS));
+
+  g_object_class_install_property (gobject_class, PROP_MAX_SIZE_BYTES,
+      g_param_spec_uint64 ("max-size-bytes", "Max recording file size in bytes",
+          "Max amount of bytes per recording file (0 = disable)",
           0, G_MAXUINT64, 0, G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS));
 
   signals[STREAM_CONNECTED_SIGNAL] =

@@ -20,6 +20,7 @@
 
 #include <gaeguli/gaeguli.h>
 #include <gio/gio.h>
+#include <glib/gstdio.h>
 #include <gst/pbutils/pbutils.h>
 
 #include "hwangsae/hwangsae.h"
@@ -508,6 +509,35 @@ test_hwangsae_recorder_split_time (TestFixture * fixture, gconstpointer unused)
   }
 }
 
+static void
+test_hwangsae_recorder_split_bytes (TestFixture * fixture, gconstpointer unused)
+{
+  GSList *filenames;
+  guint64 FILE_SEGMENT_LEN_BYTES = 5e6;
+
+  hwangsae_recorder_set_max_size_bytes (fixture->recorder,
+      FILE_SEGMENT_LEN_BYTES);
+
+  filenames = split_run_test (fixture);
+
+  for (; filenames; filenames = g_slist_delete_link (filenames, filenames)) {
+    g_autofree gchar *filename = filenames->data;
+    GStatBuf stat_buf;
+
+    g_assert (g_stat (filename, &stat_buf) == 0);
+
+    g_debug ("%s has size %luB", filename, stat_buf.st_size);
+
+    if (filenames->next) {
+      g_assert_cmpint (labs (stat_buf.st_size - FILE_SEGMENT_LEN_BYTES), <=,
+          FILE_SEGMENT_LEN_BYTES / 5);
+    } else {
+      /* The final segment should be shorter than FILE_SEGMENT_LEN_BYTES. */
+      g_assert_cmpint (stat_buf.st_size, <, FILE_SEGMENT_LEN_BYTES);
+    }
+  }
+}
+
 int
 main (int argc, char *argv[])
 {
@@ -530,6 +560,10 @@ main (int argc, char *argv[])
   g_test_add ("/hwangsae/recorder-split-time",
       TestFixture, NULL, fixture_setup,
       test_hwangsae_recorder_split_time, fixture_teardown);
+
+  g_test_add ("/hwangsae/recorder-split-bytes",
+      TestFixture, NULL, fixture_setup,
+      test_hwangsae_recorder_split_bytes, fixture_teardown);
 
   return g_test_run ();
 }
