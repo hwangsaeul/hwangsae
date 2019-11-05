@@ -364,8 +364,6 @@ recording_done_cb (HwangsaeRecorder * recorder, const gchar * file_path,
   g_debug ("Gap in the file lasts %" GST_STIME_FORMAT, GST_STIME_ARGS (gap));
 
   g_assert_cmpint (labs (GST_CLOCK_DIFF (gap, expected_gap)), <=, GST_SECOND);
-
-  g_main_loop_quit (fixture->loop);
 }
 
 static gboolean
@@ -415,6 +413,8 @@ test_hwangsae_recorder_disconnect (TestFixture * fixture, gconstpointer unused)
       (GCallback) first_segment_started_cb, fixture);
   g_signal_connect (fixture->recorder, "file-completed",
       (GCallback) recording_done_cb, fixture);
+  g_signal_connect_swapped (fixture->recorder, "stream-disconnected",
+      (GCallback) g_main_loop_quit, fixture->loop);
 
   start_streaming (fixture);
 
