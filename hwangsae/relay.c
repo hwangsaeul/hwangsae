@@ -18,6 +18,7 @@
 
 #include "relay.h"
 
+#include <srt/srt.h>
 #include <gio/gio.h>
 
 struct _HwangsaeRelay
@@ -29,6 +30,8 @@ struct _HwangsaeRelay
   guint sink_port;
   guint source_port;
 };
+
+static guint hwangsae_relay_init_refcnt = 0;
 
 /* *INDENT-OFF* */
 G_DEFINE_TYPE (HwangsaeRelay, hwangsae_relay, G_TYPE_OBJECT);
@@ -47,6 +50,11 @@ hwangsae_relay_finalize (GObject * object)
   HwangsaeRelay *self = HWANGSAE_RELAY (object);
 
   g_clear_object (&self->settings);
+
+  if (g_atomic_int_dec_and_test (&hwangsae_relay_init_refcnt)) {
+    g_debug ("Cleaning up SRT");
+    srt_cleanup ();
+  }
 
   G_OBJECT_CLASS (hwangsae_relay_parent_class)->finalize (object);
 }
@@ -93,6 +101,7 @@ hwangsae_relay_class_init (HwangsaeRelayClass * klass)
 
   gobject_class->set_property = hwangsae_relay_set_property;
   gobject_class->get_property = hwangsae_relay_get_property;
+  gobject_class->finalize = hwangsae_relay_finalize;
 
   g_object_class_install_property (gobject_class, PROP_SINK_PORT,
       g_param_spec_uint ("sink-port", "SRT Binding port (from) ",
@@ -108,6 +117,12 @@ hwangsae_relay_class_init (HwangsaeRelayClass * klass)
 static void
 hwangsae_relay_init (HwangsaeRelay * self)
 {
+  if (g_atomic_int_add (&hwangsae_relay_init_refcnt, 1) == 0) {
+    if (srt_startup () != 0) {
+      g_error ("%s", srt_getlasterror_str ());
+    }
+  }
+
   self->settings = g_settings_new ("org.hwangsaeul.hwangsae.relay");
 
   g_settings_bind (self->settings, "sink-port", self, "sink-port",

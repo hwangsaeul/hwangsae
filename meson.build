@@ -48,6 +48,8 @@ gobject_dep = dependency('gobject-2.0', version: glib_req_version,
 gstreamer_dep = dependency ('gstreamer-1.0', version: '>= 1.14.0')
 gstreamer_pbutils_dep = dependency ('gstreamer-pbutils-1.0')
 
+libsrt_dep = dependency('srt', version: '>=1.3.4')
+
 hwangsaeul_req_version = '>= 0.9.0'
 
 gaeguli_dep = dependency('gaeguli-1.0', version: hwangsaeul_req_version,
