@@ -1,5 +1,6 @@
 tests = [
   'test-recorder',
+  'test-relay',
 ]
 
 env = environment()
