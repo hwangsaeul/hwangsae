@@ -5,11 +5,13 @@ configure_file(output: 'config.h', configuration: cdata)
 source_h = [
   'hwangsae.h',
   'recorder.h',
+  'relay.h',
   'types.h',
 ]
 
 source_c = [
   'recorder.c',
+  'relay.c',
 ]
 
 gsettings_schemas = [
