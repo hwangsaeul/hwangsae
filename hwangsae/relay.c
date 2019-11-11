@@ -22,6 +22,9 @@
 #include <gio/gio.h>
 
 const guint32 SRT_BACKLOG_LEN = 100;
+const gint MAX_EPOLL_SRT_SOCKETS = 4000;
+const int64_t MAX_EPOLL_WAIT_TIMEOUT_MS = 100;
+const gint SRT_POLL_EVENTS = SRT_EPOLL_IN | SRT_EPOLL_ERR;
 
 typedef struct
 {
@@ -44,6 +47,10 @@ struct _HwangsaeRelay
   SRTSOCKET source_listen_sock;
 
   SinkConnection *sink;
+  int poll_id;
+
+  GThread *relay_thread;
+  gboolean run_relay_thread;
 };
 
 static guint hwangsae_relay_init_refcnt = 0;
@@ -79,9 +86,41 @@ static SrtParam srt_params[] = {
 };
 
 static void
+hwangsae_relay_remove_source (HwangsaeRelay * self, SRTSOCKET sink_socket,
+    SRTSOCKET source_socket)
+{
+  g_assert (self->sink && sink_socket == self->sink->socket);
+
+  g_debug ("Closing source connection %d", source_socket);
+
+  self->sink->sources = g_slist_remove (self->sink->sources,
+      GINT_TO_POINTER (source_socket));
+  srt_close (source_socket);
+}
+
+static void
+hwangsae_relay_remove_sink (HwangsaeRelay * self, SRTSOCKET sink_socket)
+{
+  g_assert (self->sink && sink_socket == self->sink->socket);
+
+  g_debug ("Closing sink connection %d", sink_socket);
+
+  while (self->sink->sources) {
+    hwangsae_relay_remove_source (self, self->sink->socket,
+        GPOINTER_TO_INT (self->sink->sources->data));
+  }
+
+  srt_close (self->sink->socket);
+  g_clear_pointer (&self->sink, g_free);
+}
+
+static void
 hwangsae_relay_finalize (GObject * object)
 {
   HwangsaeRelay *self = HWANGSAE_RELAY (object);
+
+  self->run_relay_thread = FALSE;
+  g_clear_pointer (&self->relay_thread, g_thread_join);
 
   g_mutex_clear (&self->lock);
 
@@ -89,12 +128,10 @@ hwangsae_relay_finalize (GObject * object)
   srt_close (self->source_listen_sock);
 
   if (self->sink) {
-    g_slist_foreach (self->sink->sources, (GFunc) srt_close, NULL);
-    srt_close (self->sink->socket);
-    g_slist_free (self->sink->sources);
-    g_clear_pointer (&self->sink, g_free);
+    hwangsae_relay_remove_sink (self, self->sink->socket);
   }
 
+  g_clear_handle_id (&self->poll_id, srt_epoll_release);
   g_clear_object (&self->settings);
 
   if (g_atomic_int_dec_and_test (&hwangsae_relay_init_refcnt)) {
@@ -237,6 +274,7 @@ hwangsae_relay_accept_sink (HwangsaeRelay * self, SRTSOCKET sock,
 
   self->sink = g_new0 (SinkConnection, 1);
   self->sink->socket = sock;
+  srt_epoll_add_usock (self->poll_id, sock, &SRT_POLL_EVENTS);
 
   return 0;
 }
@@ -260,6 +298,74 @@ hwangsae_relay_accept_source (HwangsaeRelay * self, SRTSOCKET sock,
   return 0;
 }
 
+static gpointer
+_relay_main (gpointer data)
+{
+  HwangsaeRelay *self = HWANGSAE_RELAY (data);
+  SRTSOCKET readfds[MAX_EPOLL_SRT_SOCKETS];
+  gchar buf[1400];
+
+  while (self->run_relay_thread) {
+    gint rnum = G_N_ELEMENTS (readfds);
+
+    if (srt_epoll_wait (self->poll_id, readfds, &rnum, 0, 0,
+            MAX_EPOLL_WAIT_TIMEOUT_MS, NULL, 0, NULL, 0) > 0) {
+
+      if (!self->run_relay_thread) {
+        break;
+      }
+
+      while (rnum != 0) {
+        SRTSOCKET rsocket = readfds[--rnum];
+        gint recv;
+
+        LOCK_RELAY;
+
+        if (rsocket == self->sink_listen_sock ||
+            rsocket == self->source_listen_sock) {
+          /* We already added the socket to our internal structures in the
+           * accept callback, so only finalize its creation with srt_accept
+           * here */
+          srt_accept (rsocket, NULL, NULL);
+        } else {
+          do {
+            recv = srt_recv (rsocket, buf, sizeof (buf));
+
+            if (recv > 0) {
+              GSList *it = self->sink->sources;
+
+              while (it) {
+                SRTSOCKET source_socket = GPOINTER_TO_INT (it->data);
+
+                it = it->next;
+
+                if (srt_send (source_socket, buf, recv) < 0) {
+                  gint error = srt_getlasterror (NULL);
+                  if (error == SRT_ECONNLOST) {
+                    hwangsae_relay_remove_source (self, rsocket, source_socket);
+                  } else {
+                    g_debug ("srt_send failed %s", srt_strerror (error, 0));
+                  }
+                }
+              }
+            } else if (recv < 0) {
+              gint error = srt_getlasterror (NULL);
+              if (error == SRT_ECONNLOST) {
+                hwangsae_relay_remove_sink (self, rsocket);
+                break;
+              } else if (error != SRT_EASYNCRCV) {
+                g_debug ("srt_recv error %s", srt_strerror (error, 0));
+              }
+            }
+          } while (recv > 0);
+        }
+      }
+    }
+  }
+
+  return NULL;
+}
+
 static void
 hwangsae_relay_init (HwangsaeRelay * self)
 {
@@ -278,12 +384,22 @@ hwangsae_relay_init (HwangsaeRelay * self)
   g_settings_bind (self->settings, "source-port", self, "source-port",
       G_SETTINGS_BIND_DEFAULT);
 
+  self->poll_id = srt_epoll_create ();
+
   self->sink_listen_sock = _srt_open_listen_sock (self->sink_port);
   srt_listen_callback (self->sink_listen_sock,
       (srt_listen_callback_fn *) hwangsae_relay_accept_sink, self);
+  srt_epoll_add_usock (self->poll_id, self->sink_listen_sock, &SRT_POLL_EVENTS);
+
   self->source_listen_sock = _srt_open_listen_sock (self->source_port);
   srt_listen_callback (self->source_listen_sock,
       (srt_listen_callback_fn *) hwangsae_relay_accept_source, self);
+  srt_epoll_add_usock (self->poll_id, self->source_listen_sock,
+      &SRT_POLL_EVENTS);
+
+  LOCK_RELAY;
+  self->run_relay_thread = TRUE;
+  self->relay_thread = g_thread_new ("HwangsaeRelay", _relay_main, self);
 }
 
 HwangsaeRelay *
