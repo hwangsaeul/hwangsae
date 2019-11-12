@@ -17,6 +17,6 @@ hwangsae_agent = executable (
   source_c,
   include_directories: hwangsae_incs,
   c_args: hwangsae_agent_c_args,
-  dependencies: [ gobject_dep, gio_dep, libhwangsae_dbus_dep, libhwangsae_dep ],
+  dependencies: [ gobject_dep, gio_dep, libhwangsae_dbus_dep, libhwangsae_dep, chamge_dep],
   install: true
 )
