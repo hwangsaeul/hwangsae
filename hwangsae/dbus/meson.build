@@ -38,5 +38,5 @@ libhwangsae_dbus = shared_library(
 
 libhwangsae_dbus_dep = declare_dependency(link_with: libhwangsae_dbus,
   include_directories: [ hwangsae_incs ],
-  dependencies: [ gio_dep, libhwangsae_dep ]
+  dependencies: [ gio_dep ]
 )
