@@ -23,16 +23,113 @@
 
 #include <glib-unix.h>
 
+#include <hwangsae/dbus/manager-generated.h>
+#include <hwangsae/dbus/edge-interface-generated.h>
+
 struct _HwangsaeAgent
 {
   GApplication parent;
 
   HwangsaeRelay *relay;
+  Hwangsae1DBusManager *manager;
+  Hwangsae1DBusEdgeInterface *edge_interface;
 };
 
 /* *INDENT-OFF* */
 G_DEFINE_TYPE (HwangsaeAgent, hwangsae_agent, G_TYPE_APPLICATION)
 /* *INDENT-ON* */
+
+static gboolean
+hwangsae_agent_dbus_register (GApplication * app,
+    GDBusConnection * connection, const gchar * object_path, GError ** error)
+{
+  gboolean ret;
+  HwangsaeAgent *self = HWANGSAE_AGENT (app);
+
+  g_debug ("hwangsae_agent_dbus_register");
+
+  g_application_hold (app);
+
+  /* chain up */
+  ret =
+      G_APPLICATION_CLASS (hwangsae_agent_parent_class)->dbus_register
+      (app, connection, object_path, error);
+
+  if (ret &&
+      !g_dbus_interface_skeleton_export (G_DBUS_INTERFACE_SKELETON
+          (self->manager), connection,
+          "/org/hwangsaeul/Hwangsae1/Manager", error)) {
+    g_warning ("Failed to export Hwangsae1 D-Bus interface (reason: %s)",
+        (*error)->message);
+  }
+
+  if (ret &&
+      !g_dbus_interface_skeleton_export (G_DBUS_INTERFACE_SKELETON
+          (self->edge_interface), connection,
+          "/org/hwangsaeul/Hwangsae1/EdgeInterface", error)) {
+    g_warning ("Failed to export Hwangsae1 D-Bus interface (reason: %s)",
+        (*error)->message);
+  }
+
+  return ret;
+}
+
+static void
+hwangsae_agent_dbus_unregister (GApplication * app,
+    GDBusConnection * connection, const gchar * object_path)
+{
+  HwangsaeAgent *self = HWANGSAE_AGENT (app);
+
+  g_debug ("hwangsae_agent_dbus_unregister");
+
+  if (self->manager)
+    g_dbus_interface_skeleton_unexport (G_DBUS_INTERFACE_SKELETON
+        (self->manager));
+
+  if (self->edge_interface)
+    g_dbus_interface_skeleton_unexport (G_DBUS_INTERFACE_SKELETON
+        (self->edge_interface));
+
+  g_application_release (app);
+
+  /* chain up */
+  G_APPLICATION_CLASS (hwangsae_agent_parent_class)->dbus_unregister (app,
+      connection, object_path);
+}
+
+gboolean
+hwangsae_agent_edge_interface_handle_start (Hwangsae1DBusEdgeInterface * object,
+    GDBusMethodInvocation * invocation, gchar * arg_id, gpointer user_data)
+{
+  g_autofree gchar *cmd = NULL;
+  g_autofree gchar *response = NULL;
+  GError *error = NULL;
+  HwangsaeAgent *self = (HwangsaeAgent *) user_data;
+  gchar *uid = NULL;
+
+  g_debug ("hwangsae_agent_edge_interface_handle_start");
+
+  hwangsae1_dbus_edge_interface_complete_start (object, invocation);
+
+  return TRUE;
+}
+
+gboolean
+hwangsae_agent_edge_interface_handle_stop (Hwangsae1DBusEdgeInterface * object,
+    GDBusMethodInvocation * invocation, gchar * arg_id, gpointer user_data)
+{
+  g_autofree gchar *cmd = NULL;
+  g_autofree gchar *response = NULL;
+  GError *error = NULL;
+  HwangsaeAgent *self = (HwangsaeAgent *) user_data;
+  gchar *uid = NULL;
+
+  g_debug ("hwangsae_agent_edge_interface_handle_stop");
+
+  hwangsae1_dbus_edge_interface_complete_stop (object, invocation);
+
+  return TRUE;
+}
 
 static void
 hwangsae_agent_dispose (GObject * object)
@@ -41,6 +138,9 @@ hwangsae_agent_dispose (GObject * object)
 
   g_clear_object (&self->relay);
 
+  g_clear_object (&self->manager);
+  g_clear_object (&self->edge_interface);
+
   G_OBJECT_CLASS (hwangsae_agent_parent_class)->dispose (object);
 }
 
@@ -48,14 +148,12 @@ static void
 hwangsae_agent_class_init (HwangsaeAgentClass * klass)
 {
   GObjectClass *gobject_class = G_OBJECT_CLASS (klass);
+  GApplicationClass *app_class = G_APPLICATION_CLASS (klass);
 
   gobject_class->dispose = hwangsae_agent_dispose;
-}
 
-static void
-hwangsae_agent_init (HwangsaeAgent * self)
-{
-  self->relay = hwangsae_relay_new ();
+  app_class->dbus_register = hwangsae_agent_dbus_register;
+  app_class->dbus_unregister = hwangsae_agent_dbus_unregister;
 }
 
 static gboolean
@@ -64,6 +162,26 @@ signal_handler (GApplication * app)
   g_application_release (app);
 
   return G_SOURCE_REMOVE;
+}
+
+static void
+hwangsae_agent_init (HwangsaeAgent * self)
+{
+  gchar *uid = NULL;
+
+  self->relay = hwangsae_relay_new ();
+
+  self->manager = hwangsae1_dbus_manager_skeleton_new ();
+
+  hwangsae1_dbus_manager_set_status (self->manager, 1);
+
+  self->edge_interface = hwangsae1_dbus_edge_interface_skeleton_new ();
+
+  g_signal_connect (self->edge_interface, "handle-start",
+      G_CALLBACK (hwangsae_agent_edge_interface_handle_start), self);
+
+  g_signal_connect (self->edge_interface, "handle-stop",
+      G_CALLBACK (hwangsae_agent_edge_interface_handle_stop), self);
 }
 
 int
