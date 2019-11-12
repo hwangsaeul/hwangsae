@@ -54,6 +54,8 @@ hwangsaeul_req_version = '>= 0.9.0'
 
 gaeguli_dep = dependency('gaeguli-1.0', version: hwangsaeul_req_version,
     fallback: ['gaeguli', 'libgaeguli_dep'])
+chamge_dep = dependency('chamge-1.0', version: hwangsaeul_req_version,
+    fallback: ['chamge', 'libchamge_dep'])
 
 gnome = import('gnome')
 python3 = import('python').find_installation()
