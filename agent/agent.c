@@ -21,6 +21,8 @@
 #include "agent.h"
 #include <hwangsae/relay.h>
 
+#include <glib-unix.h>
+
 struct _HwangsaeAgent
 {
   GApplication parent;
@@ -56,6 +58,14 @@ hwangsae_agent_init (HwangsaeAgent * self)
   self->relay = hwangsae_relay_new ();
 }
 
+static gboolean
+signal_handler (GApplication * app)
+{
+  g_application_release (app);
+
+  return G_SOURCE_REMOVE;
+}
+
 int
 main (int argc, char *argv[])
 {
@@ -64,6 +74,10 @@ main (int argc, char *argv[])
   app = G_APPLICATION (g_object_new (HWANGSAE_TYPE_AGENT,
           "application-id", "org.hwangsaeul.Hwangsae1",
           "flags", G_APPLICATION_IS_SERVICE, NULL));
+
+  g_unix_signal_add (SIGINT, (GSourceFunc) signal_handler, app);
+
+  g_application_hold (app);
 
   return g_application_run (app, argc, argv);
 }
