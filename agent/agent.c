@@ -25,6 +25,10 @@
 
 #include <hwangsae/dbus/manager-generated.h>
 #include <hwangsae/dbus/edge-interface-generated.h>
+#include <chamge/chamge.h>
+
+#define DEFAULT_HUB_UID        "abc-987-123"
+#define DEFAULT_BACKEND         CHAMGE_BACKEND_AMQP
 
 struct _HwangsaeAgent
 {
@@ -33,6 +37,7 @@ struct _HwangsaeAgent
   HwangsaeRelay *relay;
   Hwangsae1DBusManager *manager;
   Hwangsae1DBusEdgeInterface *edge_interface;
+  ChamgeHub *chamge_hub;
 };
 
 /* *INDENT-OFF* */
@@ -101,13 +106,28 @@ gboolean
 hwangsae_agent_edge_interface_handle_start (Hwangsae1DBusEdgeInterface * object,
     GDBusMethodInvocation * invocation, gchar * arg_id, gpointer user_data)
 {
+  ChamgeReturn ret = CHAMGE_RETURN_OK;
   g_autofree gchar *cmd = NULL;
   g_autofree gchar *response = NULL;
   GError *error = NULL;
   HwangsaeAgent *self = (HwangsaeAgent *) user_data;
   gchar *uid = NULL;
 
-  g_debug ("hwangsae_agent_edge_interface_handle_start");
+  cmd =
+      g_strdup_printf ("{\"to\":\"%s\",\"method\":\"streamingStart\"}", arg_id);
+
+  g_debug ("hwangsae_agent_edge_interface_handle_start, cmd %s", cmd);
+
+  g_object_get (self->chamge_hub, "uid", &uid, NULL);
+  g_assert_cmpstr (uid, ==, DEFAULT_HUB_UID);
+
+  ret =
+      chamge_node_user_command (CHAMGE_NODE (self->chamge_hub), cmd,
+      &response, &error);
+
+  if (ret != CHAMGE_RETURN_OK) {
+    g_debug ("failed to send user command >> %s\n", error->message);
+  }
 
   hwangsae1_dbus_edge_interface_complete_start (object, invocation);
 
@@ -118,13 +138,28 @@ gboolean
 hwangsae_agent_edge_interface_handle_stop (Hwangsae1DBusEdgeInterface * object,
     GDBusMethodInvocation * invocation, gchar * arg_id, gpointer user_data)
 {
+  ChamgeReturn ret = CHAMGE_RETURN_OK;
   g_autofree gchar *cmd = NULL;
   g_autofree gchar *response = NULL;
   GError *error = NULL;
   HwangsaeAgent *self = (HwangsaeAgent *) user_data;
   gchar *uid = NULL;
 
-  g_debug ("hwangsae_agent_edge_interface_handle_stop");
+  cmd =
+      g_strdup_printf ("{\"to\":\"%s\",\"method\":\"streamingStop\"}", arg_id);
+
+  g_debug ("hwangsae_agent_edge_interface_handle_stop, cmd %s", cmd);
+
+  g_object_get (self->chamge_hub, "uid", &uid, NULL);
+  g_assert_cmpstr (uid, ==, DEFAULT_HUB_UID);
+
+  ret =
+      chamge_node_user_command (CHAMGE_NODE (self->chamge_hub), cmd,
+      &response, &error);
+
+  if (ret != CHAMGE_RETURN_OK) {
+    g_debug ("failed to send user command >> %s\n", error->message);
+  }
 
   hwangsae1_dbus_edge_interface_complete_stop (object, invocation);
 
@@ -140,6 +175,7 @@ hwangsae_agent_dispose (GObject * object)
 
   g_clear_object (&self->manager);
   g_clear_object (&self->edge_interface);
+  g_clear_object (&self->chamge_hub);
 
   G_OBJECT_CLASS (hwangsae_agent_parent_class)->dispose (object);
 }
@@ -167,9 +203,22 @@ signal_handler (GApplication * app)
 static void
 hwangsae_agent_init (HwangsaeAgent * self)
 {
+  ChamgeReturn ret;
   gchar *uid = NULL;
 
   self->relay = hwangsae_relay_new ();
+
+  /* TODO : HUB UID should be get from configuration */
+  self->chamge_hub = chamge_hub_new_full (DEFAULT_HUB_UID, DEFAULT_BACKEND);
+
+  g_object_get (self->chamge_hub, "uid", &uid, NULL);
+  g_assert_cmpstr (uid, ==, DEFAULT_HUB_UID);
+
+  ret = chamge_node_enroll (CHAMGE_NODE (self->chamge_hub), FALSE);
+  g_assert (ret == CHAMGE_RETURN_OK);
+
+  ret = chamge_node_activate (CHAMGE_NODE (self->chamge_hub));
+  g_assert (ret == CHAMGE_RETURN_OK);
 
   self->manager = hwangsae1_dbus_manager_skeleton_new ();
 
