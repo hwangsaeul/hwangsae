@@ -33,8 +33,21 @@ G_DEFINE_TYPE (HwangsaeAgent, hwangsae_agent, G_TYPE_APPLICATION)
 /* *INDENT-ON* */
 
 static void
+hwangsae_agent_dispose (GObject * object)
+{
+  HwangsaeAgent *self = HWANGSAE_AGENT (object);
+
+  g_clear_object (&self->relay);
+
+  G_OBJECT_CLASS (hwangsae_agent_parent_class)->dispose (object);
+}
+
+static void
 hwangsae_agent_class_init (HwangsaeAgentClass * klass)
 {
+  GObjectClass *gobject_class = G_OBJECT_CLASS (klass);
+
+  gobject_class->dispose = hwangsae_agent_dispose;
 }
 
 static void
