@@ -13,15 +13,13 @@ dbus_headers = []
 foreach iface: dbus_ifaces
   prefix = 'org.hwangsaeul.Hwangsae1.'
   name = prefix + iface[0] 
-  dbus_sources = gnome.gdbus_codegen(
+
+  sources += gnome.gdbus_codegen(
     iface[1],
     sources: name + '.xml',
     interface_prefix: prefix,
-    namespace: 'HwangsaeDBus',
+    namespace: 'Hwangsae1DBus',
   )
-  dbus_headers = dbus_sources[0]
-  sources += dbus_sources[1]
-
 endforeach
 
 libhwangsae_dbus = shared_library(
