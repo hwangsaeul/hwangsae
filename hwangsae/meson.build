@@ -37,13 +37,15 @@ hwangsae_enums = gnome.mkenums_simple(
 hwangsae_enums_h = hwangsae_enums[1]
 hwangsae_enums_c = hwangsae_enums[0]
 
+subdir('dbus')
+
 libhwangsae = library(
   'hwangsae-@0@'.format(apiversion),
   hwangsae_enums, source_c,
   version: libversion,
   soversion: soversion,
   include_directories: hwangsae_incs,
-  dependencies: [ gstreamer_dep, gio_dep, libsrt_dep ],
+  dependencies: [ gstreamer_dep, gio_dep, libsrt_dep,libhwangsae_dbus_dep ],
   c_args: hwangsae_c_args,
   link_args: common_ldflags,
   install: true
@@ -63,4 +65,4 @@ gnome = import('gnome')
 hwangsae_schemas = gnome.compile_schemas(depend_files: gsettings_schemas)
 hwangsae_schemas_dir = meson.current_build_dir()
 
-subdir('dbus')
+
