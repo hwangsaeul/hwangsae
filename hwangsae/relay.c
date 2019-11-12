@@ -259,10 +259,52 @@ hwangsae_relay_class_init (HwangsaeRelayClass * klass)
           G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS));
 }
 
+static void
+_parse_stream_id (const gchar * stream_id, gchar ** username, gchar ** resource)
+{
+  const gchar STREAM_ID_PREFIX[] = "#!::";
+  gchar **keys;
+  gchar **it;
+
+  if (!g_str_has_prefix (stream_id, STREAM_ID_PREFIX)) {
+    return;
+  }
+
+  if (username) {
+    *username = NULL;
+  }
+  if (resource) {
+    *resource = NULL;
+  }
+
+  keys = g_strsplit (stream_id + sizeof (STREAM_ID_PREFIX) - 1, ",", -1);
+  for (it = keys; *it; ++it) {
+    gchar **keyval;
+
+    keyval = g_strsplit (*it, "=", 2);
+
+    if (keyval && keyval[0] && keyval[1]) {
+      if (g_str_equal (keyval[0], "u") && username) {
+        g_clear_pointer (username, g_free);
+        *username = g_strdup (keyval[1]);
+      } else if (g_str_equal (keyval[0], "r") && resource) {
+        g_clear_pointer (resource, g_free);
+        *resource = g_strdup (keyval[1]);
+      }
+    }
+
+    g_strfreev (keyval);
+  }
+
+  g_strfreev (keys);
+}
+
 static gint
 hwangsae_relay_accept_sink (HwangsaeRelay * self, SRTSOCKET sock,
     gint hs_version, const struct sockaddr *peeraddr, const gchar * stream_id)
 {
+  g_autofree gchar *username = NULL;
+
   LOCK_RELAY;
 
   if (self->sink) {
@@ -270,7 +312,13 @@ hwangsae_relay_accept_sink (HwangsaeRelay * self, SRTSOCKET sock,
     return -1;
   }
 
-  g_debug ("Accepting sink %d", sock);
+  _parse_stream_id (stream_id, &username, NULL);
+  if (!username) {
+    // Sink socket must have username in its Stream ID.
+    return -1;
+  }
+
+  g_debug ("Accepting sink %d username: %s", sock, username);
 
   self->sink = g_new0 (SinkConnection, 1);
   self->sink->socket = sock;
