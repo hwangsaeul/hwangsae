@@ -29,6 +29,7 @@
 
 #define DEFAULT_HUB_UID        "abc-987-123"
 #define DEFAULT_BACKEND         CHAMGE_BACKEND_AMQP
+#define DEFAULT_URI            "srt://127.0.0.1:8888"
 
 struct _HwangsaeAgent
 {
@@ -114,7 +115,8 @@ hwangsae_agent_edge_interface_handle_start (Hwangsae1DBusEdgeInterface * object,
   gchar *uid = NULL;
 
   cmd =
-      g_strdup_printf ("{\"to\":\"%s\",\"method\":\"streamingStart\"}", arg_id);
+      g_strdup_printf ("{\"to\":\"%s\",\"method\":\"streamingStart\", "
+      "\"params\": {\"uri\": \"" DEFAULT_URI "\"}}", arg_id);
 
   g_debug ("hwangsae_agent_edge_interface_handle_start, cmd %s", cmd);
 
