@@ -18,6 +18,8 @@
 
 #include "relay.h"
 
+#include <ifaddrs.h>
+#include <net/if.h>
 #include <srt/srt.h>
 #include <gio/gio.h>
 
@@ -42,6 +44,8 @@ struct _HwangsaeRelay
 
   guint sink_port;
   guint source_port;
+
+  gchar *sink_uri;
 
   SRTSOCKET sink_listen_sock;
   SRTSOCKET source_listen_sock;
@@ -123,6 +127,8 @@ hwangsae_relay_finalize (GObject * object)
   g_clear_pointer (&self->relay_thread, g_thread_join);
 
   g_mutex_clear (&self->lock);
+
+  g_clear_pointer (&self->sink_uri, g_free);
 
   srt_close (self->sink_listen_sock);
   srt_close (self->source_listen_sock);
@@ -439,6 +445,8 @@ hwangsae_relay_init (HwangsaeRelay * self)
       (srt_listen_callback_fn *) hwangsae_relay_accept_sink, self);
   srt_epoll_add_usock (self->poll_id, self->sink_listen_sock, &SRT_POLL_EVENTS);
 
+  g_debug ("URI for sink connection is %s", hwangsae_relay_get_sink_uri (self));
+
   self->source_listen_sock = _srt_open_listen_sock (self->source_port);
   srt_listen_callback (self->source_listen_sock,
       (srt_listen_callback_fn *) hwangsae_relay_accept_source, self);
@@ -454,4 +462,62 @@ HwangsaeRelay *
 hwangsae_relay_new (void)
 {
   return g_object_new (HWANGSAE_TYPE_RELAY, NULL);
+}
+
+static gchar *
+_get_local_ip (void)
+{
+  struct ifaddrs *addrs;
+  struct ifaddrs *it;
+  gchar *result = NULL;
+
+  if (getifaddrs (&addrs) < 0) {
+    return NULL;
+  }
+
+  for (it = addrs; !result && it; it = it->ifa_next) {
+    socklen_t addr_len;
+    char buf[INET6_ADDRSTRLEN + 1];
+
+    /* Ignore interfaces that are down, not running or don't have an IP. We also
+     * want to skip loopbacks. */
+    if ((it->ifa_flags & (IFF_UP | IFF_RUNNING | IFF_LOOPBACK)) !=
+        (IFF_UP | IFF_RUNNING) || it->ifa_addr == NULL) {
+      continue;
+    }
+
+    switch (it->ifa_addr->sa_family) {
+      case AF_INET:
+        addr_len = sizeof (struct sockaddr_in);
+        break;
+      case AF_INET6:
+        addr_len = sizeof (struct sockaddr_in6);
+        break;
+      default:
+        continue;
+    }
+
+    if (getnameinfo (it->ifa_addr, addr_len, buf, sizeof (buf), NULL, 0,
+            NI_NUMERICHOST) != 0) {
+      continue;
+    }
+
+    result = g_strdup (buf);
+  }
+
+  freeifaddrs (addrs);
+
+  return result;
+}
+
+const gchar *
+hwangsae_relay_get_sink_uri (HwangsaeRelay * self)
+{
+  if (!self->sink_uri) {
+    g_autofree gchar *ip = _get_local_ip ();
+
+    self->sink_uri = g_strdup_printf ("srt://%s:%d", ip, self->sink_port);
+  }
+
+  return self->sink_uri;
 }

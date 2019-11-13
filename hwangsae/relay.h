@@ -33,6 +33,8 @@ G_DECLARE_FINAL_TYPE            (HwangsaeRelay, hwangsae_relay, HWANGSAE, RELAY,
 
 HwangsaeRelay          *hwangsae_relay_new              (void);
 
+const gchar            *hwangsae_relay_get_sink_uri     (HwangsaeRelay *relay);
+
 G_END_DECLS
 
 #endif // __HWANGSAE_RELAY_H__
