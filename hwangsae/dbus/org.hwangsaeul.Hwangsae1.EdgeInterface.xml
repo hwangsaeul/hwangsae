@@ -34,6 +34,7 @@
     -->
     <method name="Stop">
       <arg name="id" direction="in" type="s"/>
+      <arg name="url" direction="out" type="s"/>
     </method>
 
     <!--
@@ -44,6 +45,11 @@
     -->
     <method name="Start">
       <arg name="id" direction="in" type="s"/>
+      <arg name="width" direction="in" type="i"/>
+      <arg name="height" direction="in" type="i"/>
+      <arg name="fps" direction="in" type="i"/>
+      <arg name="bitrates" direction="in" type="i"/>
+      <arg name="url" direction="out" type="s"/>
     </method>
 
     <!--

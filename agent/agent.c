@@ -105,7 +105,8 @@ hwangsae_agent_dbus_unregister (GApplication * app,
 
 gboolean
 hwangsae_agent_edge_interface_handle_start (Hwangsae1DBusEdgeInterface * object,
-    GDBusMethodInvocation * invocation, gchar * arg_id, gpointer user_data)
+    GDBusMethodInvocation * invocation, gchar * arg_id, gint arg_width,
+    gint arg_height, gint arg_fps, gint arg_bitrates, gpointer user_data)
 {
   ChamgeReturn ret = CHAMGE_RETURN_OK;
   g_autofree gchar *cmd = NULL;
@@ -116,7 +117,9 @@ hwangsae_agent_edge_interface_handle_start (Hwangsae1DBusEdgeInterface * object,
 
   cmd =
       g_strdup_printf ("{\"to\":\"%s\",\"method\":\"streamingStart\", "
-      "\"params\": {\"uri\": \"" DEFAULT_URI "\"}}", arg_id);
+      "\"params\": {\"url\": \"" DEFAULT_URI "\", "
+      "\"width\":%d, \"height\":%d, \"fps\": %d, \"bitrates\": %d}}",
+      arg_id, arg_width, arg_height, arg_fps, arg_bitrates);
 
   g_debug ("hwangsae_agent_edge_interface_handle_start, cmd %s", cmd);
 
@@ -131,7 +134,8 @@ hwangsae_agent_edge_interface_handle_start (Hwangsae1DBusEdgeInterface * object,
     g_debug ("failed to send user command >> %s\n", error->message);
   }
 
-  hwangsae1_dbus_edge_interface_complete_start (object, invocation);
+  hwangsae1_dbus_edge_interface_complete_start (object, invocation,
+      DEFAULT_URI);
 
   return TRUE;
 }
@@ -163,7 +167,7 @@ hwangsae_agent_edge_interface_handle_stop (Hwangsae1DBusEdgeInterface * object,
     g_debug ("failed to send user command >> %s\n", error->message);
   }
 
-  hwangsae1_dbus_edge_interface_complete_stop (object, invocation);
+  hwangsae1_dbus_edge_interface_complete_stop (object, invocation, DEFAULT_URI);
 
   return TRUE;
 }
