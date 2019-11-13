@@ -31,8 +31,31 @@ const gint SRT_POLL_EVENTS = SRT_EPOLL_IN | SRT_EPOLL_ERR;
 typedef struct
 {
   SRTSOCKET socket;
+  gchar *username;
   GSList *sources;
 } SinkConnection;
+
+static void
+_sink_connection_remove_source (SinkConnection * sink, SRTSOCKET source)
+{
+  g_debug ("Closing source connection %d", source);
+  srt_close (source);
+  sink->sources = g_slist_remove (sink->sources, GINT_TO_POINTER (source));
+}
+
+static void
+_sink_connection_free (SinkConnection * sink)
+{
+  while (sink->sources) {
+    _sink_connection_remove_source (sink,
+        GPOINTER_TO_INT (sink->sources->data));
+  }
+
+  g_debug ("Closing sink connection %d", sink->socket);
+  srt_close (sink->socket);
+  g_clear_pointer (&sink->username, g_free);
+  g_free (sink);
+}
 
 struct _HwangsaeRelay
 {
@@ -50,7 +73,8 @@ struct _HwangsaeRelay
   SRTSOCKET sink_listen_sock;
   SRTSOCKET source_listen_sock;
 
-  SinkConnection *sink;
+  GHashTable *srtsocket_sink_map;
+  GHashTable *username_sink_map;
   int poll_id;
 
   GThread *relay_thread;
@@ -90,32 +114,10 @@ static SrtParam srt_params[] = {
 };
 
 static void
-hwangsae_relay_remove_source (HwangsaeRelay * self, SRTSOCKET sink_socket,
-    SRTSOCKET source_socket)
+hwangsae_relay_remove_sink (HwangsaeRelay * self, SinkConnection * sink)
 {
-  g_assert (self->sink && sink_socket == self->sink->socket);
-
-  g_debug ("Closing source connection %d", source_socket);
-
-  self->sink->sources = g_slist_remove (self->sink->sources,
-      GINT_TO_POINTER (source_socket));
-  srt_close (source_socket);
-}
-
-static void
-hwangsae_relay_remove_sink (HwangsaeRelay * self, SRTSOCKET sink_socket)
-{
-  g_assert (self->sink && sink_socket == self->sink->socket);
-
-  g_debug ("Closing sink connection %d", sink_socket);
-
-  while (self->sink->sources) {
-    hwangsae_relay_remove_source (self, self->sink->socket,
-        GPOINTER_TO_INT (self->sink->sources->data));
-  }
-
-  srt_close (self->sink->socket);
-  g_clear_pointer (&self->sink, g_free);
+  g_hash_table_remove (self->username_sink_map, sink->username);
+  g_hash_table_remove (self->srtsocket_sink_map, &sink->socket);
 }
 
 static void
@@ -133,9 +135,8 @@ hwangsae_relay_finalize (GObject * object)
   srt_close (self->sink_listen_sock);
   srt_close (self->source_listen_sock);
 
-  if (self->sink) {
-    hwangsae_relay_remove_sink (self, self->sink->socket);
-  }
+  g_hash_table_destroy (self->srtsocket_sink_map);
+  g_hash_table_destroy (self->username_sink_map);
 
   g_clear_handle_id (&self->poll_id, srt_epoll_release);
   g_clear_object (&self->settings);
@@ -309,14 +310,10 @@ static gint
 hwangsae_relay_accept_sink (HwangsaeRelay * self, SRTSOCKET sock,
     gint hs_version, const struct sockaddr *peeraddr, const gchar * stream_id)
 {
-  g_autofree gchar *username = NULL;
+  gchar *username = NULL;
+  SinkConnection *sink;
 
   LOCK_RELAY;
-
-  if (self->sink) {
-    // We already have a sink connected.
-    return -1;
-  }
 
   _parse_stream_id (stream_id, &username, NULL);
   if (!username) {
@@ -324,30 +321,66 @@ hwangsae_relay_accept_sink (HwangsaeRelay * self, SRTSOCKET sock,
     return -1;
   }
 
+  if (g_hash_table_contains (self->username_sink_map, username)) {
+    /* Sink already registered. */
+    return -1;
+  }
+
   g_debug ("Accepting sink %d username: %s", sock, username);
 
-  self->sink = g_new0 (SinkConnection, 1);
-  self->sink->socket = sock;
+  sink = g_new0 (SinkConnection, 1);
+  sink->socket = sock;
+  sink->username = username;
+
+  g_hash_table_insert (self->srtsocket_sink_map, &sink->socket, sink);
+  g_hash_table_insert (self->username_sink_map, sink->username, sink);
+
   srt_epoll_add_usock (self->poll_id, sock, &SRT_POLL_EVENTS);
 
   return 0;
+}
+
+static gboolean
+_find_first_value (gpointer key, gpointer value, gpointer user_data)
+{
+  return TRUE;
 }
 
 static gint
 hwangsae_relay_accept_source (HwangsaeRelay * self, SRTSOCKET sock,
     gint hs_version, const struct sockaddr *peeraddr, const gchar * stream_id)
 {
+  g_autofree gchar *resource = NULL;
+  SinkConnection *sink;
+
   LOCK_RELAY;
 
-  if (!self->sink) {
-    // We have no sink.
+  if (g_hash_table_size (self->srtsocket_sink_map) == 0) {
+    /* We have no sinks. */
     return -1;
   }
 
+  _parse_stream_id (stream_id, NULL, &resource);
+
   g_debug ("Accepting source %d", sock);
 
-  self->sink->sources = g_slist_append (self->sink->sources,
-      GINT_TO_POINTER (sock));
+  if (resource) {
+    sink = g_hash_table_lookup (self->username_sink_map, resource);
+  } else {
+    /*
+     * Pick the first available sink.
+     * TODO: Reject sources without 'r' key in Stream ID.
+     */
+    sink =
+        g_hash_table_find (self->srtsocket_sink_map, _find_first_value, NULL);
+  }
+
+  if (!sink) {
+    /* Reject the attempt to connect an unknown sink. */
+    return -1;
+  }
+
+  sink->sources = g_slist_append (sink->sources, GINT_TO_POINTER (sock));
 
   return 0;
 }
@@ -371,7 +404,6 @@ _relay_main (gpointer data)
 
       while (rnum != 0) {
         SRTSOCKET rsocket = readfds[--rnum];
-        gint recv;
 
         LOCK_RELAY;
 
@@ -382,11 +414,17 @@ _relay_main (gpointer data)
            * here */
           srt_accept (rsocket, NULL, NULL);
         } else {
+          gint recv;
+          SinkConnection *sink;
+
+          sink = g_hash_table_lookup (self->srtsocket_sink_map, &rsocket);
+          g_assert (sink != NULL);
+
           do {
             recv = srt_recv (rsocket, buf, sizeof (buf));
 
             if (recv > 0) {
-              GSList *it = self->sink->sources;
+              GSList *it = sink->sources;
 
               while (it) {
                 SRTSOCKET source_socket = GPOINTER_TO_INT (it->data);
@@ -396,7 +434,7 @@ _relay_main (gpointer data)
                 if (srt_send (source_socket, buf, recv) < 0) {
                   gint error = srt_getlasterror (NULL);
                   if (error == SRT_ECONNLOST) {
-                    hwangsae_relay_remove_source (self, rsocket, source_socket);
+                    _sink_connection_remove_source (sink, source_socket);
                   } else {
                     g_debug ("srt_send failed %s", srt_strerror (error, 0));
                   }
@@ -405,7 +443,7 @@ _relay_main (gpointer data)
             } else if (recv < 0) {
               gint error = srt_getlasterror (NULL);
               if (error == SRT_ECONNLOST) {
-                hwangsae_relay_remove_sink (self, rsocket);
+                hwangsae_relay_remove_sink (self, sink);
                 break;
               } else if (error != SRT_EASYNCRCV) {
                 g_debug ("srt_recv error %s", srt_strerror (error, 0));
@@ -452,6 +490,10 @@ hwangsae_relay_init (HwangsaeRelay * self)
       (srt_listen_callback_fn *) hwangsae_relay_accept_source, self);
   srt_epoll_add_usock (self->poll_id, self->source_listen_sock,
       &SRT_POLL_EVENTS);
+
+  self->srtsocket_sink_map = g_hash_table_new_full (g_int_hash, g_int_equal,
+      NULL, (GDestroyNotify) _sink_connection_free);
+  self->username_sink_map = g_hash_table_new (g_str_hash, g_str_equal);
 
   LOCK_RELAY;
   self->run_relay_thread = TRUE;
