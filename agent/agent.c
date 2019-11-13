@@ -54,8 +54,6 @@ hwangsae_agent_dbus_register (GApplication * app,
 
   g_debug ("hwangsae_agent_dbus_register");
 
-  g_application_hold (app);
-
   /* chain up */
   ret =
       G_APPLICATION_CLASS (hwangsae_agent_parent_class)->dbus_register
