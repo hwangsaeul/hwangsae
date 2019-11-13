@@ -15,7 +15,8 @@ jobs:
         gstreamer1.0-plugins-bad gstreamer1.0-plugins-ugly \
         gstreamer1.0-libav \
         libgstreamer1.0-dev libgstreamer-plugins-base1.0-dev \
-        libgstreamer-plugins-bad1.0-dev
+        libgstreamer-plugins-bad1.0-dev \
+        libgaeguli-dev libchamge-dev
 
     displayName: 'Installing GStreamer 1.16 from hwangsaeul Nightly PPA'
 
