@@ -1,9 +1,5 @@
-source_h = [
-  'agent.h',
-]
-
-source_c = [
-  'agent.c',
+agents = [
+  'relay-agent',
 ]
 
 hwangsae_agent_c_args = [
@@ -12,11 +8,17 @@ hwangsae_agent_c_args = [
 ]
 
 
-hwangsae_agent = executable (
-  'hwangsae-agent', 
-  source_c,
-  include_directories: hwangsae_incs,
-  c_args: hwangsae_agent_c_args,
-  dependencies: [ gobject_dep, gio_dep, libhwangsae_dbus_dep, libhwangsae_dep, chamge_dep],
-  install: true
-)
+foreach agent: agents
+  exe_name = 'hwangsae-@0@'.format(agent)
+  src_file = '@0@.c'.format(agent)
+
+  executable(exe_name,
+    src_file,
+    install: true,
+    include_directories: hwangsae_incs,
+    dependencies : [ libgaeguli_dep ],
+    c_args: [ hwangsae_agent_c_args, ],
+  dependencies: [ gobject_dep, gio_dep, libhwangsae_dbus_dep, libhwangsae_dep, chamge_dep ],
+  )
+
+endforeach

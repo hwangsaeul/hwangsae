@@ -17,17 +17,17 @@
  */
 
 
-#ifndef __HWANGSAE_AGENT_H__
-#define __HWANGSAE_AGENT_H__
+#ifndef __HWANGSAE_RELAY_AGENT_H__
+#define __HWANGSAE_RELAY_AGENT_H__
 
 #include <glib-object.h>
 #include <gio/gio.h>
 
 G_BEGIN_DECLS
 
-#define HWANGSAE_TYPE_AGENT             (hwangsae_agent_get_type ())
-G_DECLARE_FINAL_TYPE                    (HwangsaeAgent, hwangsae_agent, HWANGSAE, AGENT, GApplication)
+#define HWANGSAE_TYPE_RELAY_AGENT       (hwangsae_relay_agent_get_type ())
+G_DECLARE_FINAL_TYPE                    (HwangsaeRelayAgent, hwangsae_relay_agent, HWANGSAE, RELAY_AGENT, GApplication)
 
 G_END_DECLS
 
-#endif // __HWANGSAE_AGENT_H__
+#endif // __HWANGSAE_RELAY_AGENT_H__
