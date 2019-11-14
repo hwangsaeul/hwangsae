@@ -1,5 +1,6 @@
 agents = [
   'relay-agent',
+  'recorder-agent',
 ]
 
 hwangsae_agent_c_args = [

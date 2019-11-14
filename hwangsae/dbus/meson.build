@@ -6,6 +6,7 @@ sources = [
 dbus_ifaces = [
   [ 'Manager', 'manager-generated' ],
   [ 'EdgeInterface', 'edge-interface-generated' ],
+  [ 'RecorderInterface', 'recorder-interface-generated' ],
 ]
 
 dbus_headers = []
