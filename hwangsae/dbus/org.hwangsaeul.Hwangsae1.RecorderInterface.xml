@@ -1,0 +1,28 @@
+<?xml version="1.0"?>
+<!DOCTYPE node PUBLIC "-//freedesktop//DTD D-BUS Object Introspection 1.0//EN" "http://www.freedesktop.org/standards/dbus/1.0/introspect.dtd">
+<node xmlns:doc="http://www.freedesktop.org/dbus/1.0/doc.dtd" name="/">
+  <interface name="org.hwangsaeul.Hwangsae1.RecorderInterface">
+
+    <!--
+    Stop:
+    @id:        an unique id of edge
+
+    Send stop request in relation to Edge by @edgeId.
+    -->
+    <method name="Stop">
+      <arg name="edgeId" direction="in" type="s"/>
+    </method>
+
+    <!--
+    Start:
+    @id:        an unique id of edge
+
+    Send start request in realtion to Edge by @edgeId.
+    -->
+    <method name="Start">
+      <arg name="edgeId" direction="in" type="s"/>
+      <arg name="recordId" direction="out" type="s"/>
+    </method>
+
+  </interface>
+</node>
