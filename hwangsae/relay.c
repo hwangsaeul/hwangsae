@@ -69,6 +69,7 @@ struct _HwangsaeRelay
   guint source_port;
 
   gchar *sink_uri;
+  gchar *source_uri;
 
   SRTSOCKET sink_listen_sock;
   SRTSOCKET source_listen_sock;
@@ -131,6 +132,7 @@ hwangsae_relay_finalize (GObject * object)
   g_mutex_clear (&self->lock);
 
   g_clear_pointer (&self->sink_uri, g_free);
+  g_clear_pointer (&self->source_uri, g_free);
 
   srt_close (self->sink_listen_sock);
   srt_close (self->source_listen_sock);
@@ -552,14 +554,30 @@ _get_local_ip (void)
   return result;
 }
 
+static gchar *
+_make_uri_with_port (guint port)
+{
+  g_autofree gchar *ip = _get_local_ip ();
+
+  return g_strdup_printf ("srt://%s:%d", ip, port);
+}
+
 const gchar *
 hwangsae_relay_get_sink_uri (HwangsaeRelay * self)
 {
   if (!self->sink_uri) {
-    g_autofree gchar *ip = _get_local_ip ();
-
-    self->sink_uri = g_strdup_printf ("srt://%s:%d", ip, self->sink_port);
+    self->sink_uri = _make_uri_with_port (self->sink_port);
   }
 
   return self->sink_uri;
+}
+
+const gchar *
+hwangsae_relay_get_source_uri (HwangsaeRelay * self)
+{
+  if (!self->source_uri) {
+    self->source_uri = _make_uri_with_port (self->source_port);
+  }
+
+  return self->source_uri;
 }

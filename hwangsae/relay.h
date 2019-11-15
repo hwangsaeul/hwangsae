@@ -35,6 +35,8 @@ HwangsaeRelay          *hwangsae_relay_new              (void);
 
 const gchar            *hwangsae_relay_get_sink_uri     (HwangsaeRelay *relay);
 
+const gchar            *hwangsae_relay_get_source_uri   (HwangsaeRelay *relay);
+
 G_END_DECLS
 
 #endif // __HWANGSAE_RELAY_H__
