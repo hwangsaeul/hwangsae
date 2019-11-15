@@ -1,3 +1,7 @@
+test_c_args = '-DG_LOG_DOMAIN="hwangsae-tests"'
+
+subdir('common')
+
 tests = [
   'test-recorder',
   'test-relay',
@@ -16,8 +20,9 @@ foreach t: tests
 
   exe = executable(
     t, ['@0@.c'.format(t), hwangsae_schemas],
-    c_args: '-DG_LOG_DOMAIN="hwangsae-tests"',
+    c_args: test_c_args,
     include_directories: hwangsae_incs,
+    link_with: libhwangsae_test_common,
     dependencies: [ libhwangsae_dep, gaeguli_dep, gstreamer_pbutils_dep ],
     install: false,
   )
