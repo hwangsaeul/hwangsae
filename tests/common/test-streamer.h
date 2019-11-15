@@ -28,10 +28,12 @@ G_BEGIN_DECLS
 #define HWANGSAE_TYPE_TEST_STREAMER     (hwangsae_test_streamer_get_type ())
 G_DECLARE_FINAL_TYPE                    (HwangsaeTestStreamer, hwangsae_test_streamer, HWANGSAE, TEST_STREAMER, GObject)
 
-HwangsaeTestStreamer * hwangsae_test_streamer_new   (void);
-void                   hwangsae_test_streamer_start (HwangsaeTestStreamer * self);
-void                   hwangsae_test_streamer_pause (HwangsaeTestStreamer * self);
-void                   hwangsae_test_streamer_stop  (HwangsaeTestStreamer * self);
+HwangsaeTestStreamer * hwangsae_test_streamer_new     (void);
+void                   hwangsae_test_streamer_set_uri (HwangsaeTestStreamer * self,
+                                                       const gchar *uri);
+void                   hwangsae_test_streamer_start   (HwangsaeTestStreamer * self);
+void                   hwangsae_test_streamer_pause   (HwangsaeTestStreamer * self);
+void                   hwangsae_test_streamer_stop    (HwangsaeTestStreamer * self);
 
 G_END_DECLS
 
