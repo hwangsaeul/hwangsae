@@ -24,12 +24,12 @@
 #include <gst/pbutils/pbutils.h>
 
 #include "hwangsae/hwangsae.h"
+#include "common/test-streamer.h"
 
 typedef struct
 {
   GMainLoop *loop;
-  GaeguliFifoTransmit *transmit;
-  GaeguliPipeline *pipeline;
+  HwangsaeTestStreamer *streamer;
   HwangsaeRecorder *recorder;
 
   gboolean should_stream;
@@ -42,70 +42,19 @@ fixture_setup (TestFixture * fixture, gconstpointer unused)
   g_autoptr (GError) error = NULL;
 
   fixture->loop = g_main_loop_new (NULL, FALSE);
-  fixture->transmit = gaeguli_fifo_transmit_new ();
-  fixture->pipeline =
-      gaeguli_pipeline_new_full (GAEGULI_VIDEO_SOURCE_VIDEOTESTSRC, NULL,
-      GAEGULI_ENCODING_METHOD_GENERAL);
+  fixture->streamer = hwangsae_test_streamer_new ();
   fixture->recorder = hwangsae_recorder_new ();
   g_object_set (fixture->recorder, "recording-dir", "/tmp", NULL);
 
-  g_object_set (fixture->pipeline, "clock-overlay", TRUE, NULL);
-
-  gaeguli_pipeline_add_fifo_target_full (fixture->pipeline,
-      GAEGULI_VIDEO_CODEC_H264, GAEGULI_VIDEO_RESOLUTION_640X480,
-      gaeguli_fifo_transmit_get_fifo (fixture->transmit), &error);
   g_assert_no_error (error);
 }
 
 static void
 fixture_teardown (TestFixture * fixture, gconstpointer unused)
 {
+  g_clear_object (&fixture->streamer);
   g_clear_object (&fixture->recorder);
-  g_clear_object (&fixture->transmit);
-  g_clear_object (&fixture->pipeline);
   g_clear_pointer (&fixture->loop, g_main_loop_unref);
-}
-
-static gboolean
-streaming_thread_func (TestFixture * fixture)
-{
-  g_autoptr (GMainContext) context = g_main_context_new ();
-  g_autoptr (GError) error = NULL;
-  guint transmit_id;
-
-  g_main_context_push_thread_default (context);
-
-  transmit_id = gaeguli_fifo_transmit_start (fixture->transmit,
-      "127.0.0.1", 8888, GAEGULI_SRT_MODE_LISTENER, &error);
-  g_assert_no_error (error);
-
-  while (fixture->should_stream) {
-    g_main_context_iteration (context, TRUE);
-  }
-
-  gaeguli_fifo_transmit_stop (fixture->transmit, transmit_id, &error);
-  g_assert_no_error (error);
-
-  return TRUE;
-}
-
-static void
-start_streaming (TestFixture * fixture)
-{
-  g_assert_null (fixture->streaming_thread);
-
-  fixture->should_stream = TRUE;
-  fixture->streaming_thread = g_thread_new ("streaming_thread_func",
-      (GThreadFunc) streaming_thread_func, fixture);
-}
-
-static void
-stop_streaming (TestFixture * fixture)
-{
-  g_assert_nonnull (fixture->streaming_thread);
-
-  fixture->should_stream = FALSE;
-  g_clear_pointer (&fixture->streaming_thread, g_thread_join);
 }
 
 static GstClockTime
@@ -208,8 +157,7 @@ stream_disconnected_cb (HwangsaeRecorder * recorder, TestFixture * fixture)
 {
   g_debug ("Stream disconnected");
 
-  gaeguli_pipeline_stop (fixture->pipeline);
-  stop_streaming (fixture);
+  hwangsae_test_streamer_stop (fixture->streamer);
 
   g_main_loop_quit (fixture->loop);
 }
@@ -234,7 +182,7 @@ test_hwangsae_recorder_record (TestFixture * fixture, gconstpointer data)
   g_signal_connect (fixture->recorder, "stream-disconnected",
       (GCallback) stream_disconnected_cb, fixture);
 
-  start_streaming (fixture);
+  hwangsae_test_streamer_start (fixture->streamer);
 
   hwangsae_recorder_start_recording (fixture->recorder, "srt://127.0.0.1:8888");
 
@@ -349,8 +297,7 @@ recording_done_cb (HwangsaeRecorder * recorder, const gchar * file_path,
   const GstClockTime expected_duration = 3 * SEGMENT_LEN_SECONDS * GST_SECOND;
   const GstClockTime expected_gap = SEGMENT_LEN_SECONDS * GST_SECOND;
 
-  gaeguli_pipeline_stop (fixture->pipeline);
-  stop_streaming (fixture);
+  hwangsae_test_streamer_stop (fixture->streamer);
 
   duration = get_file_duration (file_path);
 
@@ -380,7 +327,7 @@ static gboolean
 second_segment_started_cb (TestFixture * fixture)
 {
   g_debug ("Recording second segment of %u seconds.", SEGMENT_LEN_SECONDS);
-  start_streaming (fixture);
+  hwangsae_test_streamer_start (fixture->streamer);
   g_timeout_add_seconds (SEGMENT_LEN_SECONDS,
       (GSourceFunc) second_segment_done_cb, fixture);
 
@@ -392,7 +339,7 @@ first_segment_done_cb (TestFixture * fixture)
 {
   g_debug ("First segment done. Stopping streaming for %u seconds.",
       SEGMENT_LEN_SECONDS);
-  stop_streaming (fixture);
+  hwangsae_test_streamer_pause (fixture->streamer);
   g_timeout_add_seconds (SEGMENT_LEN_SECONDS,
       (GSourceFunc) second_segment_started_cb, fixture);
 
@@ -417,7 +364,7 @@ test_hwangsae_recorder_disconnect (TestFixture * fixture, gconstpointer unused)
   g_signal_connect_swapped (fixture->recorder, "stream-disconnected",
       (GCallback) g_main_loop_quit, fixture->loop);
 
-  start_streaming (fixture);
+  hwangsae_test_streamer_start (fixture->streamer);
 
   hwangsae_recorder_start_recording (fixture->recorder, "srt://127.0.0.1:8888");
 
@@ -468,7 +415,7 @@ split_run_test (TestFixture * fixture)
   g_signal_connect (fixture->recorder, "stream-disconnected",
       (GCallback) stream_disconnected_cb, fixture);
 
-  start_streaming (fixture);
+  hwangsae_test_streamer_start (fixture->streamer);
 
   hwangsae_recorder_start_recording (fixture->recorder, "srt://127.0.0.1:8888");
 
