@@ -21,10 +21,13 @@
 #include "test-streamer.h"
 
 #include <gaeguli/gaeguli.h>
+#include <gst/gsturi.h>
 
 struct _HwangsaeTestStreamer
 {
   GObject parent;
+
+  gchar *uri;
 
   GaeguliFifoTransmit *transmit;
   GaeguliPipeline *pipeline;
@@ -42,12 +45,25 @@ hwangsae_test_streamer_thread_func (HwangsaeTestStreamer * self)
 {
   g_autoptr (GMainContext) context = g_main_context_new ();
   g_autoptr (GError) error = NULL;
+  g_autoptr (GstUri) uri = NULL;
+  const gchar *mode_str;
+  GaeguliSRTMode mode = GAEGULI_SRT_MODE_UNKNOWN;
   guint transmit_id;
 
   g_main_context_push_thread_default (context);
 
+  uri = gst_uri_from_string (self->uri);
+
+  mode_str = gst_uri_get_query_value (uri, "mode");
+  if (!mode_str || g_str_equal (mode_str, "caller")) {
+    mode = GAEGULI_SRT_MODE_CALLER;
+  } else if (g_str_equal (mode_str, "listener")) {
+    mode = GAEGULI_SRT_MODE_LISTENER;
+  }
+  g_assert (mode != GAEGULI_SRT_MODE_UNKNOWN);
+
   transmit_id = gaeguli_fifo_transmit_start (self->transmit,
-      "127.0.0.1", 8888, GAEGULI_SRT_MODE_LISTENER, &error);
+      gst_uri_get_host (uri), gst_uri_get_port (uri), mode, &error);
   g_assert_no_error (error);
 
   while (self->should_stream) {
@@ -58,6 +74,13 @@ hwangsae_test_streamer_thread_func (HwangsaeTestStreamer * self)
   g_assert_no_error (error);
 
   return TRUE;
+}
+
+void
+hwangsae_test_streamer_set_uri (HwangsaeTestStreamer * self, const gchar * uri)
+{
+  g_clear_pointer (&self->uri, g_free);
+  self->uri = g_strdup (uri);
 }
 
 void
@@ -89,6 +112,7 @@ hwangsae_test_streamer_init (HwangsaeTestStreamer * self)
 {
   g_autoptr (GError) error = NULL;
 
+  self->uri = g_strdup ("srt://127.0.0.1:8888?mode=listener");
   self->transmit = gaeguli_fifo_transmit_new ();
   self->pipeline = gaeguli_pipeline_new_full (GAEGULI_VIDEO_SOURCE_VIDEOTESTSRC,
       NULL, GAEGULI_ENCODING_METHOD_GENERAL);
@@ -110,6 +134,7 @@ hwangsae_test_streamer_dispose (GObject * object)
     hwangsae_test_streamer_stop (self);
   }
 
+  g_clear_pointer (&self->uri, g_free);
   g_clear_object (&self->transmit);
   g_clear_object (&self->pipeline);
 
