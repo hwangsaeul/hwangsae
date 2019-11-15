@@ -28,6 +28,7 @@ struct _HwangsaeTestStreamer
   GObject parent;
 
   gchar *uri;
+  gchar *username;
 
   GaeguliFifoTransmit *transmit;
   GaeguliPipeline *pipeline;
@@ -62,8 +63,9 @@ hwangsae_test_streamer_thread_func (HwangsaeTestStreamer * self)
   }
   g_assert (mode != GAEGULI_SRT_MODE_UNKNOWN);
 
-  transmit_id = gaeguli_fifo_transmit_start (self->transmit,
-      gst_uri_get_host (uri), gst_uri_get_port (uri), mode, &error);
+  transmit_id = gaeguli_fifo_transmit_start_full (self->transmit,
+      gst_uri_get_host (uri), gst_uri_get_port (uri), mode, self->username,
+      &error);
   g_assert_no_error (error);
 
   while (self->should_stream) {
@@ -113,6 +115,7 @@ hwangsae_test_streamer_init (HwangsaeTestStreamer * self)
   g_autoptr (GError) error = NULL;
 
   self->uri = g_strdup ("srt://127.0.0.1:8888?mode=listener");
+  self->username = g_strdup_printf ("HwangsaeTestStreamer %p", self);
   self->transmit = gaeguli_fifo_transmit_new ();
   self->pipeline = gaeguli_pipeline_new_full (GAEGULI_VIDEO_SOURCE_VIDEOTESTSRC,
       NULL, GAEGULI_ENCODING_METHOD_GENERAL);
@@ -135,6 +138,7 @@ hwangsae_test_streamer_dispose (GObject * object)
   }
 
   g_clear_pointer (&self->uri, g_free);
+  g_clear_pointer (&self->username, g_free);
   g_clear_object (&self->transmit);
   g_clear_object (&self->pipeline);
 
