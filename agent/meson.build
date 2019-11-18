@@ -18,7 +18,8 @@ foreach agent: agents
     install: true,
     include_directories: hwangsae_incs,
     c_args: [ hwangsae_agent_c_args, ],
-    dependencies: [ libhwangsae_dbus_dep, libhwangsae_dep, chamge_dep ],
+    dependencies: [ libhwangsae_dbus_dep, libhwangsae_dep, chamge_dep,
+                   gstreamer_dep],
   )
 
 endforeach

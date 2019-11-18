@@ -40,6 +40,7 @@ typedef struct
   GstElement *pipeline;
 
   gchar *recording_dir;
+  gint64 record_id;
   HwangsaeContainer container;
   guint64 max_size_time;
   guint64 max_size_bytes;
@@ -130,6 +131,7 @@ hwangsae_recorder_stop_recording_internal (HwangsaeRecorder * self)
 {
   HwangsaeRecorderPrivate *priv = hwangsae_recorder_get_instance_private (self);
 
+  priv->record_id = -ENOENT;
   gst_element_set_state (priv->pipeline, GST_STATE_NULL);
   g_clear_pointer (&priv->pipeline, gst_object_unref);
 
@@ -188,7 +190,16 @@ first_buffer_cb (GstPad * pad, GstPadProbeInfo * info, gpointer data)
   return GST_PAD_PROBE_REMOVE;
 }
 
-void
+
+gint64
+hwangsae_recorder_get_recording_id (HwangsaeRecorder * self)
+{
+  HwangsaeRecorderPrivate *priv = hwangsae_recorder_get_instance_private (self);
+
+  return priv->record_id;
+}
+
+gint64
 hwangsae_recorder_start_recording (HwangsaeRecorder * self, const gchar * uri)
 {
   HwangsaeRecorderPrivate *priv = hwangsae_recorder_get_instance_private (self);
@@ -203,16 +214,20 @@ hwangsae_recorder_start_recording (HwangsaeRecorder * self, const gchar * uri)
   const gchar *mux_name;
   g_autoptr (GError) error = NULL;
 
-  g_return_if_fail (!priv->pipeline);
+  g_return_val_if_fail (!priv->pipeline, ENOENT);
 
   g_mkdir_with_parents (priv->recording_dir, 0750);
 
   enum_class = g_type_class_ref (HWANGSAE_TYPE_CONTAINER);
   container = g_enum_get_value (enum_class, priv->container);
 
+  priv->record_id = g_get_real_time ();
+
+  g_debug ("record_id %ld", priv->record_id);
+
   recording_file = g_build_filename (priv->recording_dir,
       "hwangsae-recording-%ld-%%05d.%s", NULL);
-  recording_file = g_strdup_printf (recording_file, g_get_real_time (),
+  recording_file = g_strdup_printf (recording_file, priv->record_id,
       container->value_nick);
 
   switch (priv->container) {
@@ -250,6 +265,8 @@ hwangsae_recorder_start_recording (HwangsaeRecorder * self, const gchar * uri)
       "max-size-bytes", priv->max_size_bytes, NULL);
 
   gst_element_set_state (priv->pipeline, GST_STATE_PLAYING);
+
+  return priv->record_id;
 }
 
 void
@@ -372,6 +389,8 @@ hwangsae_recorder_init (HwangsaeRecorder * self)
 
   g_settings_bind (priv->settings, "recording-dir", self, "recording-dir",
       G_SETTINGS_BIND_DEFAULT);
+
+  priv->record_id = -ENOENT;
 
   if (g_str_equal (priv->recording_dir, "")) {
     g_autofree gchar *dir = g_build_filename (g_get_user_data_dir (),
