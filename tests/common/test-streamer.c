@@ -45,6 +45,7 @@ G_DEFINE_TYPE (HwangsaeTestStreamer, hwangsae_test_streamer, G_TYPE_OBJECT)
 enum
 {
   PROP_RESOLUTION = 1,
+  PROP_USERNAME,
   PROP_LAST
 };
 
@@ -136,6 +137,21 @@ hwangsae_test_streamer_init (HwangsaeTestStreamer * self)
 }
 
 static void
+hwangsae_test_streamer_get_property (GObject * object, guint prop_id,
+    GValue * value, GParamSpec * pspec)
+{
+  HwangsaeTestStreamer *self = HWANGSAE_TEST_STREAMER (object);
+
+  switch (prop_id) {
+    case PROP_USERNAME:
+      g_value_set_string (value, self->username);
+      break;
+    default:
+      G_OBJECT_WARN_INVALID_PROPERTY_ID (object, prop_id, pspec);
+  }
+}
+
+static void
 hwangsae_test_streamer_set_property (GObject * object, guint prop_id,
     const GValue * value, GParamSpec * pspec)
 {
@@ -172,6 +188,7 @@ hwangsae_test_streamer_class_init (HwangsaeTestStreamerClass * klass)
 {
   GObjectClass *gobject_class = G_OBJECT_CLASS (klass);
 
+  gobject_class->get_property = hwangsae_test_streamer_get_property;
   gobject_class->set_property = hwangsae_test_streamer_set_property;
   gobject_class->dispose = hwangsae_test_streamer_dispose;
 
@@ -179,6 +196,10 @@ hwangsae_test_streamer_class_init (HwangsaeTestStreamerClass * klass)
       g_param_spec_enum ("resolution", "Video resolution", "Video resolution",
           GAEGULI_TYPE_VIDEO_RESOLUTION, GAEGULI_VIDEO_RESOLUTION_640X480,
           G_PARAM_WRITABLE | G_PARAM_CONSTRUCT | G_PARAM_STATIC_STRINGS));
+
+  g_object_class_install_property (gobject_class, PROP_USERNAME,
+      g_param_spec_string ("username", "SRT username", "SRT username",
+          NULL, G_PARAM_READABLE | G_PARAM_STATIC_STRINGS));
 }
 
 HwangsaeTestStreamer *
