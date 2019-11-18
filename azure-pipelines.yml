@@ -16,7 +16,8 @@ jobs:
         gstreamer1.0-libav \
         libgstreamer1.0-dev libgstreamer-plugins-base1.0-dev \
         libgstreamer-plugins-bad1.0-dev \
-        libgaeguli-dev libchamge-dev
+        libgaeguli-dev libchamge-dev \
+        libcurl4-openssl-dev
 
     displayName: 'Installing GStreamer 1.16 from hwangsaeul Nightly PPA'
 
