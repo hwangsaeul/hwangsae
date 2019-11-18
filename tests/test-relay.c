@@ -136,6 +136,56 @@ test_hwangsae_1_to_n (void)
   }
 }
 
+static gchar *
+build_source_uri (HwangsaeTestStreamer * streamer, HwangsaeRelay * relay)
+{
+  g_autofree gchar *streamid = NULL;
+  g_autofree gchar *source_uri = NULL;
+  g_autofree gchar *stream_caps_str = NULL;
+  const gchar *username;
+
+  g_object_get (streamer, "username", &username, NULL);
+  streamid = g_strdup_printf ("#!::r=%s", username);
+  streamid = g_uri_escape_string (streamid, NULL, FALSE);
+
+  return g_strdup_printf ("%s?streamid=%s",
+      hwangsae_relay_get_source_uri (relay), streamid);
+}
+
+static void
+test_hwangsae_m_to_n (void)
+{
+  g_autoptr (HwangsaeTestStreamer) streamer1 = hwangsae_test_streamer_new ();
+  g_autoptr (HwangsaeTestStreamer) streamer2 = hwangsae_test_streamer_new ();
+  g_autoptr (HwangsaeRelay) relay = hwangsae_relay_new ();
+  g_autofree gchar *source_uri1 = NULL;
+  g_autofree gchar *source_uri2 = NULL;
+  RelayTestData data1 = { 0 };
+  RelayTestData data2 = { 0 };
+
+  hwangsae_test_streamer_set_uri (streamer1,
+      hwangsae_relay_get_sink_uri (relay));
+  data1.resolution = GAEGULI_VIDEO_RESOLUTION_640X480;
+  g_object_set (streamer1, "resolution", data1.resolution, NULL);
+  data1.source_uri = source_uri1 = build_source_uri (streamer1, relay);
+
+  hwangsae_test_streamer_set_uri (streamer2,
+      hwangsae_relay_get_sink_uri (relay));
+  data2.resolution = GAEGULI_VIDEO_RESOLUTION_1920X1080;
+  g_object_set (streamer2, "resolution", data2.resolution, NULL);
+  data2.source_uri = source_uri2 = build_source_uri (streamer2, relay);
+
+  hwangsae_test_streamer_start (streamer1);
+  hwangsae_test_streamer_start (streamer2);
+
+  g_idle_add ((GSourceFunc) validate_stream, &data1);
+  g_idle_add ((GSourceFunc) validate_stream, &data2);
+
+  while (!data1.done && !data2.done) {
+    g_main_context_iteration (NULL, FALSE);
+  }
+}
+
 int
 main (int argc, char *argv[])
 {
@@ -146,6 +196,7 @@ main (int argc, char *argv[])
 
   g_test_add_func ("/hwangsae/relay-instance", test_hwangsae_relay_instance);
   g_test_add_func ("/hwangsae/relay-1-to-n", test_hwangsae_1_to_n);
+  g_test_add_func ("/hwangsae/relay-m-to-n", test_hwangsae_m_to_n);
 
   return g_test_run ();
 }
