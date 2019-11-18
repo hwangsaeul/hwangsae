@@ -21,6 +21,7 @@
 #include "recorder-agent.h"
 #include <hwangsae/recorder.h>
 #include <gst/gst.h>
+#include <curl/curl.h>
 
 #include <glib-unix.h>
 
@@ -44,8 +45,50 @@ struct _HwangsaeRecorderAgent
 G_DEFINE_TYPE (HwangsaeRecorderAgent, hwangsae_recorder_agent, G_TYPE_APPLICATION)
 /* *INDENT-ON* */
 
+typedef enum
+{
+  RELAY_METHOD_NONE = 0,
+  RELAY_METHOD_START_STREAMING,
+  RELAY_METHOD_STOP_STREAMING
+} relay_methods;
+
+static void
+hwangsae_recorder_agent_send_rest_api (relay_methods method, gchar * edge_id)
+{
+  CURL *curl;
+  g_autofree gchar *url = NULL;
+  g_autofree gchar *postData = NULL;
+
+  struct curl_slist *hs = NULL;
+  hs = curl_slist_append (hs, "Content-Type: application/json");
+
+  if (method == RELAY_METHOD_START_STREAMING) {
+    url =
+        g_strdup_printf ("http://localhost:8080/api/v1.0/srt/%s/%s", "start",
+        edge_id);
+    postData = g_strdup ("{}");
+  } else if (method == RELAY_METHOD_STOP_STREAMING) {
+    url =
+        g_strdup_printf ("http://localhost:8080/api/v1.0/srt/%s/%s", "stop",
+        edge_id);
+    postData = g_strdup ("{}");
+  }
+
+  curl = curl_easy_init ();
+  if (curl) {
+    curl_easy_setopt (curl, CURLOPT_URL, url);
+    curl_easy_setopt (curl, CURLOPT_HTTPHEADER, hs);
+    if (postData)
+      curl_easy_setopt (curl, CURLOPT_POSTFIELDS, postData);
+    curl_easy_perform (curl);
+    curl_easy_cleanup (curl);
+  }
+  return;
+}
+
 static gint64
-hwangsae_recorder_agent_start_recording (HwangsaeRecorderAgent * self)
+hwangsae_recorder_agent_start_recording (HwangsaeRecorderAgent * self,
+    gchar * edge_id)
 {
   g_autoptr (GError) error = NULL;
 
@@ -57,6 +100,8 @@ hwangsae_recorder_agent_start_recording (HwangsaeRecorderAgent * self)
 
   self->is_recording = TRUE;
 
+  hwangsae_recorder_agent_send_rest_api (RELAY_METHOD_START_STREAMING, edge_id);
+
 #if RECORDER_GAEGULI_SRT_MODE == GAEGULI_SRT_MODE_LISTENER
   return hwangsae_recorder_start_recording (self->recorder,
       "srt://192.168.1.3:8888?mode=listener");
@@ -67,7 +112,8 @@ hwangsae_recorder_agent_start_recording (HwangsaeRecorderAgent * self)
 }
 
 static void
-hwangsae_recorder_agent_stop_recording (HwangsaeRecorderAgent * self)
+hwangsae_recorder_agent_stop_recording (HwangsaeRecorderAgent * self,
+    gchar * edge_id)
 {
   g_autoptr (GError) error = NULL;
 
@@ -77,6 +123,8 @@ hwangsae_recorder_agent_stop_recording (HwangsaeRecorderAgent * self)
   }
 
   self->is_recording = FALSE;
+
+  hwangsae_recorder_agent_send_rest_api (RELAY_METHOD_STOP_STREAMING, edge_id);
 
   hwangsae_recorder_stop_recording (self->recorder);
 }
@@ -153,7 +201,7 @@ gboolean
   g_debug ("hwangsae_recorder_agent_recorder_interface_handle_start, cmd %s",
       cmd);
 
-  rec_id = hwangsae_recorder_agent_start_recording (self);
+  rec_id = hwangsae_recorder_agent_start_recording (self, arg_id);
 
   if (rec_id > 0)
     record_id = g_strdup_printf ("%ld", rec_id);
@@ -178,7 +226,7 @@ gboolean
   g_debug ("hwangsae_recorder_agent_recorder_interface_handle_stop, cmd %s",
       cmd);
 
-  hwangsae_recorder_agent_stop_recording (self);
+  hwangsae_recorder_agent_stop_recording (self, arg_id);
 
   hwangsae1_dbus_recorder_interface_complete_stop (object, invocation);
 
