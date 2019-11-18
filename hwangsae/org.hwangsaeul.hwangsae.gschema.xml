@@ -18,5 +18,20 @@
       <summary>Recording directory</summary>
       <description>Where Hwangsae recorder stores its files</description>
     </key>
+    <key name="relay-address" type="s">
+      <default>"127.0.0.1"</default>
+      <summary>IP address of Relay</summary>
+      <description>IP address to contact Relay for REST API and streaming</description>
+    </key>
+    <key name="relay-stream-port" type="u">
+      <default>9999</default>
+      <summary>SRT connect port for streaming from relay</summary>
+      <description>SRT port to use to connect to relay for streaming</description>
+    </key>
+    <key name="relay-api-port" type="u">
+      <default>8080</default>
+      <summary>REST API connect port to relay</summary>
+      <description>REST API port to use to connect to relay</description>
+    </key>
   </schema>
 </schemalist>
