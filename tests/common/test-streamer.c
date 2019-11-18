@@ -29,6 +29,7 @@ struct _HwangsaeTestStreamer
 
   gchar *uri;
   gchar *username;
+  GaeguliVideoResolution resolution;
 
   GaeguliFifoTransmit *transmit;
   GaeguliPipeline *pipeline;
@@ -40,6 +41,12 @@ struct _HwangsaeTestStreamer
 /* *INDENT-OFF* */
 G_DEFINE_TYPE (HwangsaeTestStreamer, hwangsae_test_streamer, G_TYPE_OBJECT)
 /* *INDENT-ON* */
+
+enum
+{
+  PROP_RESOLUTION = 1,
+  PROP_LAST
+};
 
 static gboolean
 hwangsae_test_streamer_thread_func (HwangsaeTestStreamer * self)
@@ -88,7 +95,14 @@ hwangsae_test_streamer_set_uri (HwangsaeTestStreamer * self, const gchar * uri)
 void
 hwangsae_test_streamer_start (HwangsaeTestStreamer * self)
 {
+  g_autoptr (GError) error = NULL;
+
   g_assert_null (self->streaming_thread);
+
+  gaeguli_pipeline_add_fifo_target_full (self->pipeline,
+      GAEGULI_VIDEO_CODEC_H264, self->resolution,
+      gaeguli_fifo_transmit_get_fifo (self->transmit), &error);
+  g_assert_no_error (error);
 
   self->should_stream = TRUE;
   self->streaming_thread = g_thread_new ("streaming_thread_func",
@@ -112,8 +126,6 @@ hwangsae_test_streamer_stop (HwangsaeTestStreamer * self)
 static void
 hwangsae_test_streamer_init (HwangsaeTestStreamer * self)
 {
-  g_autoptr (GError) error = NULL;
-
   self->uri = g_strdup ("srt://127.0.0.1:8888?mode=listener");
   self->username = g_strdup_printf ("HwangsaeTestStreamer %p", self);
   self->transmit = gaeguli_fifo_transmit_new ();
@@ -121,11 +133,21 @@ hwangsae_test_streamer_init (HwangsaeTestStreamer * self)
       NULL, GAEGULI_ENCODING_METHOD_GENERAL);
 
   g_object_set (self->pipeline, "clock-overlay", TRUE, NULL);
+}
 
-  gaeguli_pipeline_add_fifo_target_full (self->pipeline,
-      GAEGULI_VIDEO_CODEC_H264, GAEGULI_VIDEO_RESOLUTION_640X480,
-      gaeguli_fifo_transmit_get_fifo (self->transmit), &error);
-  g_assert_no_error (error);
+static void
+hwangsae_test_streamer_set_property (GObject * object, guint prop_id,
+    const GValue * value, GParamSpec * pspec)
+{
+  HwangsaeTestStreamer *self = HWANGSAE_TEST_STREAMER (object);
+
+  switch (prop_id) {
+    case PROP_RESOLUTION:
+      self->resolution = g_value_get_enum (value);
+      break;
+    default:
+      G_OBJECT_WARN_INVALID_PROPERTY_ID (object, prop_id, pspec);
+  }
 }
 
 static void
@@ -150,7 +172,13 @@ hwangsae_test_streamer_class_init (HwangsaeTestStreamerClass * klass)
 {
   GObjectClass *gobject_class = G_OBJECT_CLASS (klass);
 
+  gobject_class->set_property = hwangsae_test_streamer_set_property;
   gobject_class->dispose = hwangsae_test_streamer_dispose;
+
+  g_object_class_install_property (gobject_class, PROP_RESOLUTION,
+      g_param_spec_enum ("resolution", "Video resolution", "Video resolution",
+          GAEGULI_TYPE_VIDEO_RESOLUTION, GAEGULI_VIDEO_RESOLUTION_640X480,
+          G_PARAM_WRITABLE | G_PARAM_CONSTRUCT | G_PARAM_STATIC_STRINGS));
 }
 
 HwangsaeTestStreamer *
