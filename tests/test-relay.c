@@ -21,6 +21,7 @@
 #include "hwangsae/hwangsae.h"
 #include "common/test-streamer.h"
 
+#include <gaeguli/gaeguli.h>
 #include <gst/pbutils/gstdiscoverer.h>
 
 static void
@@ -40,14 +41,13 @@ test_hwangsae_relay_instance (void)
 
 typedef struct
 {
-  GMainLoop *loop;
   const gchar *source_uri;
-
-  guint num_validated_connections;
-} TestData1ToN;
+  GaeguliVideoResolution resolution;
+  gboolean done;
+} RelayTestData;
 
 static gboolean
-validate_stream (TestData1ToN * data)
+validate_stream (RelayTestData * data)
 {
   g_autoptr (GstDiscoverer) discoverer = NULL;
   g_autoptr (GstDiscovererInfo) info = NULL;
@@ -55,6 +55,10 @@ validate_stream (TestData1ToN * data)
   g_autoptr (GstCaps) stream_caps = NULL;
   g_autoptr (GError) error = NULL;
   g_autofree gchar *stream_caps_str = NULL;
+  g_autolist (GstDiscovererStreamInfo) streams = NULL;
+  GstDiscovererVideoInfo *video_info;
+  guint expected_width;
+  guint expected_height;
 
   discoverer = gst_discoverer_new (20 * GST_SECOND, &error);
   g_assert_no_error (error);
@@ -65,8 +69,9 @@ validate_stream (TestData1ToN * data)
       GST_DISCOVERER_OK);
 
   stream_info = gst_discoverer_info_get_stream_info (info);
-  stream_caps = gst_discoverer_stream_info_get_caps (stream_info);
+  g_assert (GST_IS_DISCOVERER_CONTAINER_INFO (stream_info));
 
+  stream_caps = gst_discoverer_stream_info_get_caps (stream_info);
   stream_caps_str = gst_caps_to_string (stream_caps);
   g_debug ("Stream has caps: %s", stream_caps_str);
 
@@ -75,9 +80,34 @@ validate_stream (TestData1ToN * data)
       (gst_structure_get_name (gst_caps_get_structure (stream_caps, 0)), ==,
       "video/mpegts");
 
-  if (++data->num_validated_connections == 2) {
-    g_main_loop_quit (data->loop);
+  streams =
+      gst_discoverer_container_info_get_streams (GST_DISCOVERER_CONTAINER_INFO
+      (stream_info));
+
+  g_assert_cmpint (g_list_length (streams), ==, 1);
+
+  g_assert (GST_IS_DISCOVERER_VIDEO_INFO (streams->data));
+  video_info = streams->data;
+
+  switch (data->resolution) {
+    case GAEGULI_VIDEO_RESOLUTION_640X480:
+      expected_width = 640;
+      expected_height = 480;
+      break;
+    case GAEGULI_VIDEO_RESOLUTION_1920X1080:
+      expected_width = 1920;
+      expected_height = 1080;
+      break;
+    default:
+      g_assert_not_reached ();
   }
+
+  g_assert_cmpint (gst_discoverer_video_info_get_width (video_info), ==,
+      expected_width);
+  g_assert_cmpint (gst_discoverer_video_info_get_height (video_info), ==,
+      expected_height);
+
+  data->done = TRUE;
 
   return G_SOURCE_REMOVE;
 }
@@ -87,22 +117,23 @@ test_hwangsae_1_to_n (void)
 {
   g_autoptr (HwangsaeTestStreamer) streamer = hwangsae_test_streamer_new ();
   g_autoptr (HwangsaeRelay) relay = hwangsae_relay_new ();
-  TestData1ToN data = { 0 };
+  RelayTestData data1 = { 0 };
+  RelayTestData data2 = { 0 };
 
-  data.loop = g_main_loop_new (NULL, FALSE);
-  data.source_uri = hwangsae_relay_get_source_uri (relay);
+  data1.source_uri = data2.source_uri = hwangsae_relay_get_source_uri (relay);
+  data1.resolution = data2.resolution = GAEGULI_VIDEO_RESOLUTION_640X480;
 
   hwangsae_test_streamer_set_uri (streamer,
       hwangsae_relay_get_sink_uri (relay));
   hwangsae_test_streamer_start (streamer);
 
   /* Connect and validate two receivers. */
-  g_idle_add ((GSourceFunc) validate_stream, &data);
-  g_idle_add ((GSourceFunc) validate_stream, &data);
+  g_idle_add ((GSourceFunc) validate_stream, &data1);
+  g_idle_add ((GSourceFunc) validate_stream, &data2);
 
-  g_main_loop_run (data.loop);
-
-  g_clear_pointer (&data.loop, g_main_loop_unref);
+  while (!data1.done && !data2.done) {
+    g_main_context_iteration (NULL, FALSE);
+  }
 }
 
 int
