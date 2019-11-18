@@ -246,7 +246,7 @@ main (int argc, char *argv[])
   g_autoptr (GApplication) app = NULL;
 
   app = G_APPLICATION (g_object_new (HWANGSAE_TYPE_RELAY_AGENT,
-          "application-id", "org.hwangsaeul.Hwangsae1",
+          "application-id", "org.hwangsaeul.Hwangsae1.RelayAgent",
           "flags", G_APPLICATION_IS_SERVICE, NULL));
 
   g_unix_signal_add (SIGINT, (GSourceFunc) signal_handler, app);
