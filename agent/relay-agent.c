@@ -112,13 +112,14 @@ hwangsae_relay_agent_edge_interface_handle_start (Hwangsae1DBusEdgeInterface *
   GError *error = NULL;
   HwangsaeRelayAgent *self = (HwangsaeRelayAgent *) user_data;
   gchar *uid = NULL;
-  const gchar *uri = hwangsae_relay_get_sink_uri (self->relay);
+  const gchar *sink_uri = hwangsae_relay_get_sink_uri (self->relay);
+  const gchar *source_uri = hwangsae_relay_get_source_uri (self->relay);
 
   cmd =
       g_strdup_printf ("{\"to\":\"%s\",\"method\":\"streamingStart\", "
       "\"params\": {\"url\": \"%s\", "
       "\"width\":%d, \"height\":%d, \"fps\": %d, \"bitrates\": %d}}",
-      arg_id, uri, arg_width, arg_height, arg_fps, arg_bitrates);
+      arg_id, sink_uri, arg_width, arg_height, arg_fps, arg_bitrates);
 
   g_debug ("hwangsae_relay_agent_edge_interface_handle_start, cmd %s", cmd);
 
@@ -133,7 +134,7 @@ hwangsae_relay_agent_edge_interface_handle_start (Hwangsae1DBusEdgeInterface *
     g_debug ("failed to send user command >> %s\n", error->message);
   }
 
-  hwangsae1_dbus_edge_interface_complete_start (object, invocation, uri);
+  hwangsae1_dbus_edge_interface_complete_start (object, invocation, source_uri);
 
   return TRUE;
 }
@@ -149,7 +150,7 @@ hwangsae_relay_agent_edge_interface_handle_stop (Hwangsae1DBusEdgeInterface *
   GError *error = NULL;
   HwangsaeRelayAgent *self = (HwangsaeRelayAgent *) user_data;
   gchar *uid = NULL;
-  const gchar *uri = hwangsae_relay_get_sink_uri (self->relay);
+  const gchar *uri = hwangsae_relay_get_source_uri (self->relay);
 
   cmd =
       g_strdup_printf ("{\"to\":\"%s\",\"method\":\"streamingStop\"}", arg_id);
