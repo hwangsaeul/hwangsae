@@ -20,11 +20,14 @@
 
 #include "recorder-agent.h"
 #include <hwangsae/recorder.h>
+#include <gst/gst.h>
 
 #include <glib-unix.h>
 
 #include <hwangsae/dbus/manager-generated.h>
 #include <hwangsae/dbus/recorder-interface-generated.h>
+
+#define RECORDER_GAEGULI_SRT_MODE GAEGULI_SRT_MODE_CALLER
 
 struct _HwangsaeRecorderAgent
 {
@@ -33,11 +36,50 @@ struct _HwangsaeRecorderAgent
   HwangsaeRecorder *recorder;
   Hwangsae1DBusManager *manager;
   Hwangsae1DBusRecorderInterface *recorder_interface;
+
+  gboolean is_recording;
 };
 
 /* *INDENT-OFF* */
 G_DEFINE_TYPE (HwangsaeRecorderAgent, hwangsae_recorder_agent, G_TYPE_APPLICATION)
 /* *INDENT-ON* */
+
+static gint64
+hwangsae_recorder_agent_start_recording (HwangsaeRecorderAgent * self)
+{
+  g_autoptr (GError) error = NULL;
+
+
+  if (self->is_recording) {
+    g_warning ("recording already started");
+    return hwangsae_recorder_get_recording_id (self->recorder);
+  }
+
+  self->is_recording = TRUE;
+
+#if RECORDER_GAEGULI_SRT_MODE == GAEGULI_SRT_MODE_LISTENER
+  return hwangsae_recorder_start_recording (self->recorder,
+      "srt://192.168.1.3:8888?mode=listener");
+#else
+  return hwangsae_recorder_start_recording (self->recorder,
+      "srt://192.168.1.3:8888?mode=caller");
+#endif
+}
+
+static void
+hwangsae_recorder_agent_stop_recording (HwangsaeRecorderAgent * self)
+{
+  g_autoptr (GError) error = NULL;
+
+  if (!self->is_recording) {
+    g_warning ("recording already stopped");
+    return;
+  }
+
+  self->is_recording = FALSE;
+
+  hwangsae_recorder_stop_recording (self->recorder);
+}
 
 static gboolean
 hwangsae_recorder_agent_dbus_register (GApplication * app,
@@ -103,13 +145,20 @@ gboolean
     GDBusMethodInvocation * invocation, gchar * arg_id, gpointer user_data) {
   g_autofree gchar *cmd = NULL;
   g_autofree gchar *response = NULL;
-  GError *error = NULL;
   gchar *record_id = NULL;
+  gint64 rec_id;
 
   HwangsaeRecorderAgent *self = (HwangsaeRecorderAgent *) user_data;
 
   g_debug ("hwangsae_recorder_agent_recorder_interface_handle_start, cmd %s",
       cmd);
+
+  rec_id = hwangsae_recorder_agent_start_recording (self);
+
+  if (rec_id > 0)
+    record_id = g_strdup_printf ("%ld", rec_id);
+  else
+    record_id = g_strdup ("");
 
   hwangsae1_dbus_recorder_interface_complete_start (object, invocation,
       record_id);
@@ -123,12 +172,13 @@ gboolean
     GDBusMethodInvocation * invocation, gchar * arg_id, gpointer user_data) {
   g_autofree gchar *cmd = NULL;
   g_autofree gchar *response = NULL;
-  GError *error = NULL;
 
   HwangsaeRecorderAgent *self = (HwangsaeRecorderAgent *) user_data;
 
   g_debug ("hwangsae_recorder_agent_recorder_interface_handle_stop, cmd %s",
       cmd);
+
+  hwangsae_recorder_agent_stop_recording (self);
 
   hwangsae1_dbus_recorder_interface_complete_stop (object, invocation);
 
@@ -141,7 +191,6 @@ hwangsae_recorder_agent_dispose (GObject * object)
   HwangsaeRecorderAgent *self = HWANGSAE_RECORDER_AGENT (object);
 
   g_clear_object (&self->recorder);
-
   g_clear_object (&self->manager);
   g_clear_object (&self->recorder_interface);
 
@@ -171,7 +220,7 @@ signal_handler (GApplication * app)
 static void
 hwangsae_recorder_agent_init (HwangsaeRecorderAgent * self)
 {
-  gchar *uid = NULL;
+  self->is_recording = FALSE;
 
   self->recorder = hwangsae_recorder_new ();
 
@@ -188,6 +237,8 @@ hwangsae_recorder_agent_init (HwangsaeRecorderAgent * self)
   g_signal_connect (self->recorder_interface, "handle-stop",
       G_CALLBACK (hwangsae_recorder_agent_recorder_interface_handle_stop),
       self);
+
+  hwangsae_recorder_set_container (self->recorder, HWANGSAE_CONTAINER_TS);
 }
 
 int
@@ -200,6 +251,8 @@ main (int argc, char *argv[])
           "flags", G_APPLICATION_IS_SERVICE, NULL));
 
   g_unix_signal_add (SIGINT, (GSourceFunc) signal_handler, app);
+
+  gst_init (&argc, &argv);
 
   g_application_hold (app);
 
