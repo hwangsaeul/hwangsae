@@ -30,6 +30,8 @@
 
 #define RECORDER_GAEGULI_SRT_MODE GAEGULI_SRT_MODE_CALLER
 
+#define HWANGSAE_RECORDER_SCHEMA_ID "org.hwangsaeul.hwangsae.recorder"
+
 struct _HwangsaeRecorderAgent
 {
   GApplication parent;
@@ -37,6 +39,7 @@ struct _HwangsaeRecorderAgent
   HwangsaeRecorder *recorder;
   Hwangsae1DBusManager *manager;
   Hwangsae1DBusRecorderInterface *recorder_interface;
+  GSettings *settings;
 
   gboolean is_recording;
 };
@@ -53,9 +56,13 @@ typedef enum
 } relay_methods;
 
 static void
-hwangsae_recorder_agent_send_rest_api (relay_methods method, gchar * edge_id)
+hwangsae_recorder_agent_send_rest_api (HwangsaeRecorderAgent * self,
+    relay_methods method, gchar * edge_id)
 {
   CURL *curl;
+  g_autofree gchar *host =
+      g_settings_get_string (self->settings, "relay-address");
+  guint port = g_settings_get_uint (self->settings, "relay-api-port");
   g_autofree gchar *url = NULL;
   g_autofree gchar *postData = NULL;
 
@@ -64,15 +71,17 @@ hwangsae_recorder_agent_send_rest_api (relay_methods method, gchar * edge_id)
 
   if (method == RELAY_METHOD_START_STREAMING) {
     url =
-        g_strdup_printf ("http://localhost:8080/api/v1.0/srt/%s/%s", "start",
+        g_strdup_printf ("http://%s:%d/api/v1.0/srt/%s/%s", host, port, "start",
         edge_id);
     postData = g_strdup ("{}");
   } else if (method == RELAY_METHOD_STOP_STREAMING) {
     url =
-        g_strdup_printf ("http://localhost:8080/api/v1.0/srt/%s/%s", "stop",
+        g_strdup_printf ("http://%s:%d/api/v1.0/srt/%s/%s", host, port, "stop",
         edge_id);
     postData = g_strdup ("{}");
   }
+
+  g_debug ("calling api %s", url);
 
   curl = curl_easy_init ();
   if (curl) {
@@ -91,7 +100,11 @@ hwangsae_recorder_agent_start_recording (HwangsaeRecorderAgent * self,
     gchar * edge_id)
 {
   g_autoptr (GError) error = NULL;
-
+  g_autofree gchar *host =
+      g_settings_get_string (self->settings, "relay-address");
+  guint port = g_settings_get_uint (self->settings, "relay-stream-port");
+  g_autofree gchar *streamid = NULL;
+  g_autofree gchar *url = NULL;
 
   if (self->is_recording) {
     g_warning ("recording already started");
@@ -100,15 +113,17 @@ hwangsae_recorder_agent_start_recording (HwangsaeRecorderAgent * self,
 
   self->is_recording = TRUE;
 
-  hwangsae_recorder_agent_send_rest_api (RELAY_METHOD_START_STREAMING, edge_id);
+  hwangsae_recorder_agent_send_rest_api (self, RELAY_METHOD_START_STREAMING,
+      edge_id);
 
-#if RECORDER_GAEGULI_SRT_MODE == GAEGULI_SRT_MODE_LISTENER
-  return hwangsae_recorder_start_recording (self->recorder,
-      "srt://192.168.1.3:8888?mode=listener");
-#else
-  return hwangsae_recorder_start_recording (self->recorder,
-      "srt://192.168.1.3:8888?mode=caller");
-#endif
+
+  streamid = g_strdup_printf ("#!::r=%s", edge_id);
+  streamid = g_uri_escape_string (streamid, NULL, FALSE);
+  url = g_strdup_printf ("srt://%s:%d?streamid=%s", host, port, streamid);
+
+  g_debug ("starting to recording stream from %s", url);
+
+  return hwangsae_recorder_start_recording (self->recorder, url);
 }
 
 static void
@@ -124,7 +139,8 @@ hwangsae_recorder_agent_stop_recording (HwangsaeRecorderAgent * self,
 
   self->is_recording = FALSE;
 
-  hwangsae_recorder_agent_send_rest_api (RELAY_METHOD_STOP_STREAMING, edge_id);
+  hwangsae_recorder_agent_send_rest_api (self, RELAY_METHOD_STOP_STREAMING,
+      edge_id);
 
   hwangsae_recorder_stop_recording (self->recorder);
 }
@@ -239,6 +255,7 @@ hwangsae_recorder_agent_dispose (GObject * object)
   HwangsaeRecorderAgent *self = HWANGSAE_RECORDER_AGENT (object);
 
   g_clear_object (&self->recorder);
+  g_clear_object (&self->settings);
   g_clear_object (&self->manager);
   g_clear_object (&self->recorder_interface);
 
@@ -269,6 +286,8 @@ static void
 hwangsae_recorder_agent_init (HwangsaeRecorderAgent * self)
 {
   self->is_recording = FALSE;
+
+  self->settings = g_settings_new (HWANGSAE_RECORDER_SCHEMA_ID);
 
   self->recorder = hwangsae_recorder_new ();
 
