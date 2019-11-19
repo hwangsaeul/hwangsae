@@ -33,5 +33,5 @@ jobs:
     displayName: 'Ninja build'
 
   - bash: |
-      meson test -C build -v --setup debug
+      meson test -C build -v --suite hwangsae --setup debug
     displayName: 'Test'
