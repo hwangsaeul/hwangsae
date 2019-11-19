@@ -16,9 +16,8 @@ foreach agent: agents
     src_file,
     install: true,
     include_directories: hwangsae_incs,
-    dependencies : [ libgaeguli_dep ],
     c_args: [ hwangsae_agent_c_args, ],
-  dependencies: [ gobject_dep, gio_dep, libhwangsae_dbus_dep, libhwangsae_dep, chamge_dep ],
+    dependencies: [ libhwangsae_dbus_dep, libhwangsae_dep, chamge_dep ],
   )
 
 endforeach
