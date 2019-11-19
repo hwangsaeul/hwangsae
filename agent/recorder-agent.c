@@ -249,6 +249,109 @@ gboolean
   return TRUE;
 }
 
+gint
+find_chr (const gchar * str, gchar c)
+{
+  gint pos = -1;
+  gchar *p = NULL;
+  p = strchr (str, c);
+  if (p)
+    pos = p - str;
+  return pos;
+}
+
+gchar *
+check_filename (const gchar * fn, gint64 from, gint64 to)
+{
+  gint start, stop, len, pos;
+  g_autofree gchar *tmp = NULL;
+  gchar *time;
+  g_autofree gchar *subtime = NULL;
+  gint64 time2 = 0;
+
+  start = 0;
+  stop = 0;
+  if (!g_str_has_prefix (fn, "hwangsae-recording-"))
+    return NULL;
+  start = 19;
+  if (g_str_has_suffix (fn, ".mp4"))
+    stop = 4;
+  if (g_str_has_suffix (fn, ".ts"))
+    stop = 3;
+  len = strlen (fn) - start - stop;
+  tmp = g_strndup (fn + start, len);
+
+  pos = find_chr (tmp, '-');
+
+  if (pos != -1) {
+    time = g_strndup (tmp, pos);
+    len = strlen (tmp) - pos;
+    subtime = g_strndup (tmp + pos + 1, len);
+  } else {
+    time = g_strdup (tmp);
+    subtime = NULL;
+  }
+
+  time2 = g_ascii_strtoll (time, NULL, 10);
+  if ((from > 0 && time2 < from) || (to > 0 && time2 > to))
+    return NULL;
+
+  return time;
+}
+
+gboolean
+    hwangsae_recorder_agent_recorder_interface_handle_lookup_by_record
+    (Hwangsae1DBusRecorderInterface * object,
+    GDBusMethodInvocation * invocation, gchar * arg_id, gint64 arg_from,
+    gint64 arg_to, gpointer user_data) {
+  HwangsaeRecorderAgent *self = (HwangsaeRecorderAgent *) user_data;
+  g_autofree gchar *cmd = NULL;
+  g_autofree gchar *response = NULL;
+  g_autofree gchar *recording_dir = NULL;
+  GDir *dir;
+  GError *error;
+  const gchar *filename;
+  g_autofree gchar **records;
+  GArray *record_array;
+
+  record_array = g_array_new (TRUE, TRUE, sizeof (gchar *));
+
+  g_debug
+      ("hwangsae_recorder_agent_recorder_interface_handle_lookup_by_record");
+
+  recording_dir = g_settings_get_string (self->settings, "recording-dir");
+
+  dir = g_dir_open (recording_dir, 0, &error);
+  while ((filename = g_dir_read_name (dir))) {
+    gchar *record_id = check_filename (filename, arg_from, arg_to);
+    if (record_id) {
+      if (!arg_id || !g_strcmp0 (arg_id, "") || (arg_id
+              && !g_strcmp0 (arg_id, record_id)))
+        g_array_append_val (record_array, record_id);
+    }
+  }
+
+  records = (gchar **) g_malloc (sizeof (gchar *) * record_array->len + 1);
+
+  for (gint i = 0; i < record_array->len; i++) {
+    *(records + i) = g_strdup (g_array_index (record_array, gchar *, i));
+  }
+
+  *(records + record_array->len) = 0;
+
+  hwangsae1_dbus_recorder_interface_complete_lookup_by_record (object,
+      invocation, (const char *const *) records);
+
+  for (gint i = 0; i < record_array->len; i++) {
+    g_free (g_array_index (record_array, gchar *, i));
+    g_free (*(records + i));
+  }
+
+  g_dir_close (dir);
+  g_array_free (record_array, TRUE);
+  return TRUE;
+}
+
 static void
 hwangsae_recorder_agent_dispose (GObject * object)
 {
@@ -303,6 +406,11 @@ hwangsae_recorder_agent_init (HwangsaeRecorderAgent * self)
 
   g_signal_connect (self->recorder_interface, "handle-stop",
       G_CALLBACK (hwangsae_recorder_agent_recorder_interface_handle_stop),
+      self);
+
+  g_signal_connect (self->recorder_interface, "handle-lookup-by-record",
+      G_CALLBACK
+      (hwangsae_recorder_agent_recorder_interface_handle_lookup_by_record),
       self);
 
   hwangsae_recorder_set_container (self->recorder, HWANGSAE_CONTAINER_TS);

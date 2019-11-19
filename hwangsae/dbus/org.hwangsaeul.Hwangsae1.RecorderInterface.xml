@@ -24,5 +24,18 @@
       <arg name="recordId" direction="out" type="s"/>
     </method>
 
+    <!--
+    Lookup-by-record:
+    @recordId:        an unique id of record
+
+    Lookup by record or range from-to
+    -->
+    <method name="LookupByRecord">
+      <arg name="recordId" direction="in" type="s"/>
+      <arg name="from" direction="in" type="x"/>
+      <arg name="to" direction="in" type="x"/>
+      <arg name="records" direction="out" type="as"/>
+    </method>
+
   </interface>
 </node>
