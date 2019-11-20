@@ -25,7 +25,7 @@
 #include <gst/pbutils/gstdiscoverer.h>
 
 static void
-test_hwangsae_relay_instance (void)
+test_relay_instance (void)
 {
   guint sink_port, source_port;
   g_autoptr (HwangsaeRelay) relay = hwangsae_relay_new ();
@@ -113,7 +113,7 @@ validate_stream (RelayTestData * data)
 }
 
 static void
-test_hwangsae_1_to_n (void)
+test_1_to_n (void)
 {
   g_autoptr (HwangsaeTestStreamer) streamer = hwangsae_test_streamer_new ();
   g_autoptr (HwangsaeRelay) relay = hwangsae_relay_new ();
@@ -153,7 +153,7 @@ build_source_uri (HwangsaeTestStreamer * streamer, HwangsaeRelay * relay)
 }
 
 static void
-test_hwangsae_m_to_n (void)
+test_m_to_n (void)
 {
   g_autoptr (HwangsaeTestStreamer) streamer1 = hwangsae_test_streamer_new ();
   g_autoptr (HwangsaeTestStreamer) streamer2 = hwangsae_test_streamer_new ();
@@ -194,9 +194,9 @@ main (int argc, char *argv[])
   /* Don't treat warnings as fatal, which is GTest default. */
   g_log_set_always_fatal (G_LOG_FATAL_MASK | G_LOG_LEVEL_CRITICAL);
 
-  g_test_add_func ("/hwangsae/relay-instance", test_hwangsae_relay_instance);
-  g_test_add_func ("/hwangsae/relay-1-to-n", test_hwangsae_1_to_n);
-  g_test_add_func ("/hwangsae/relay-m-to-n", test_hwangsae_m_to_n);
+  g_test_add_func ("/hwangsae/relay-instance", test_relay_instance);
+  g_test_add_func ("/hwangsae/relay-1-to-n", test_1_to_n);
+  g_test_add_func ("/hwangsae/relay-m-to-n", test_m_to_n);
 
   return g_test_run ();
 }
