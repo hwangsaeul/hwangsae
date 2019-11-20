@@ -1,28 +1,27 @@
-agents = [
-  'relay-agent',
-  'recorder-agent',
-]
+hwangsae_relay_agent_src = ['relay-agent.c']
+
+hwangsae_recorder_agent_src = ['recorder-agent.c', 'http-server.c']
 
 hwangsae_agent_c_args = [
   '-DG_LOG_DOMAIN="HWANGSAE-AGENT"',
   '-DHWANGSAE_COMPILATION',
 ]
 
-libcurl_req_version = '>= 7.0.0'
+soup_dep = dependency('libsoup-2.4')
+json_glib_dep = dependency('json-glib-1.0')
 
-libcurl_dep = dependency('libcurl', version: libcurl_req_version)
+executable('hwangsae-relay-agent',
+  hwangsae_relay_agent_src,
+  install: true,
+  include_directories: hwangsae_incs,
+  c_args: [ hwangsae_agent_c_args, ],
+  dependencies: [ libhwangsae_dbus_dep, libhwangsae_dep, chamge_dep,
+                 gstreamer_dep],)
 
-foreach agent: agents
-  exe_name = 'hwangsae-@0@'.format(agent)
-  src_file = '@0@.c'.format(agent)
-
-  executable(exe_name,
-    src_file,
-    install: true,
-    include_directories: hwangsae_incs,
-    c_args: [ hwangsae_agent_c_args, ],
-    dependencies: [ libhwangsae_dbus_dep, libhwangsae_dep, chamge_dep,
-                   gstreamer_dep, libcurl_dep],
-  )
-
-endforeach
+executable('hwangsae-recorder-agent',
+  hwangsae_recorder_agent_src,
+  install: true,
+  include_directories: hwangsae_incs,
+  c_args: [ hwangsae_agent_c_args, ],
+  dependencies: [ libhwangsae_dbus_dep, libhwangsae_dep, gstreamer_dep,
+                 soup_dep, json_glib_dep],)
