@@ -163,7 +163,7 @@ stream_disconnected_cb (HwangsaeRecorder * recorder, TestFixture * fixture)
 }
 
 static void
-test_hwangsae_recorder_record (TestFixture * fixture, gconstpointer data)
+test_recorder_record (TestFixture * fixture, gconstpointer data)
 {
   HwangsaeContainer container = GPOINTER_TO_INT (data);
   RecorderTestData test_data = { 0 };
@@ -355,7 +355,7 @@ first_segment_started_cb (HwangsaeRecorder * recorder, TestFixture * fixture)
 }
 
 static void
-test_hwangsae_recorder_disconnect (TestFixture * fixture, gconstpointer unused)
+test_recorder_disconnect (TestFixture * fixture, gconstpointer unused)
 {
   g_signal_connect (fixture->recorder, "stream-connected",
       (GCallback) first_segment_started_cb, fixture);
@@ -430,7 +430,7 @@ split_run_test (TestFixture * fixture)
 }
 
 static void
-test_hwangsae_recorder_split_time (TestFixture * fixture, gconstpointer unused)
+test_recorder_split_time (TestFixture * fixture, gconstpointer unused)
 {
   GSList *filenames;
   const GstClockTimeDiff FILE_SEGMENT_LEN = 5 * GST_SECOND;
@@ -457,7 +457,7 @@ test_hwangsae_recorder_split_time (TestFixture * fixture, gconstpointer unused)
 }
 
 static void
-test_hwangsae_recorder_split_bytes (TestFixture * fixture, gconstpointer unused)
+test_recorder_split_bytes (TestFixture * fixture, gconstpointer unused)
 {
   GSList *filenames;
   guint64 FILE_SEGMENT_LEN_BYTES = 5e6;
@@ -494,23 +494,23 @@ main (int argc, char *argv[])
 
   g_test_add ("/hwangsae/recorder-record-mp4",
       TestFixture, GUINT_TO_POINTER (HWANGSAE_CONTAINER_MP4), fixture_setup,
-      test_hwangsae_recorder_record, fixture_teardown);
+      test_recorder_record, fixture_teardown);
 
   g_test_add ("/hwangsae/recorder-record-ts",
       TestFixture, GUINT_TO_POINTER (HWANGSAE_CONTAINER_TS), fixture_setup,
-      test_hwangsae_recorder_record, fixture_teardown);
+      test_recorder_record, fixture_teardown);
 
   g_test_add ("/hwangsae/recorder-disconnect",
       TestFixture, NULL, fixture_setup,
-      test_hwangsae_recorder_disconnect, fixture_teardown);
+      test_recorder_disconnect, fixture_teardown);
 
   g_test_add ("/hwangsae/recorder-split-time",
       TestFixture, NULL, fixture_setup,
-      test_hwangsae_recorder_split_time, fixture_teardown);
+      test_recorder_split_time, fixture_teardown);
 
   g_test_add ("/hwangsae/recorder-split-bytes",
       TestFixture, NULL, fixture_setup,
-      test_hwangsae_recorder_split_bytes, fixture_teardown);
+      test_recorder_split_bytes, fixture_teardown);
 
   return g_test_run ();
 }
