@@ -19,9 +19,11 @@
 #include "config.h"
 
 #include "recorder-agent.h"
+#include "http-server.h"
 #include <hwangsae/recorder.h>
 #include <gst/gst.h>
-#include <curl/curl.h>
+#include <libsoup/soup.h>
+#include <libsoup/soup-message.h>
 
 #include <glib-unix.h>
 
@@ -40,6 +42,7 @@ struct _HwangsaeRecorderAgent
   Hwangsae1DBusManager *manager;
   Hwangsae1DBusRecorderInterface *recorder_interface;
   GSettings *settings;
+  HwangsaeHttpServer *hwangsae_http_server;
 
   gboolean is_recording;
 };
@@ -59,39 +62,46 @@ static void
 hwangsae_recorder_agent_send_rest_api (HwangsaeRecorderAgent * self,
     relay_methods method, gchar * edge_id)
 {
-  CURL *curl;
+  SoupSession *session;
+  SoupMessage *msg;
+  guint status;
   g_autofree gchar *host =
       g_settings_get_string (self->settings, "relay-address");
   guint port = g_settings_get_uint (self->settings, "relay-api-port");
   g_autofree gchar *url = NULL;
-  g_autofree gchar *postData = NULL;
-
-  struct curl_slist *hs = NULL;
-  hs = curl_slist_append (hs, "Content-Type: application/json");
+  g_autofree gchar *data = NULL;
+  guint data_size = 0;
 
   if (method == RELAY_METHOD_START_STREAMING) {
     url =
         g_strdup_printf ("http://%s:%d/api/v1.0/srt/%s/%s", host, port, "start",
         edge_id);
-    postData = g_strdup ("{}");
+    data = g_strdup ("{}");
+    data_size = strnlen (data, 32);
   } else if (method == RELAY_METHOD_STOP_STREAMING) {
     url =
         g_strdup_printf ("http://%s:%d/api/v1.0/srt/%s/%s", host, port, "stop",
         edge_id);
-    postData = g_strdup ("{}");
+    data = g_strdup ("{}");
+    data_size = strnlen (data, 32);
   }
 
   g_debug ("calling api %s", url);
+  g_debug ("calling api data %s", data);
 
-  curl = curl_easy_init ();
-  if (curl) {
-    curl_easy_setopt (curl, CURLOPT_URL, url);
-    curl_easy_setopt (curl, CURLOPT_HTTPHEADER, hs);
-    if (postData)
-      curl_easy_setopt (curl, CURLOPT_POSTFIELDS, postData);
-    curl_easy_perform (curl);
-    curl_easy_cleanup (curl);
-  }
+  session = soup_session_new ();
+
+  msg = soup_message_new ("POST", url);
+
+  soup_message_set_request (msg, "application/json",
+      SOUP_MEMORY_COPY, data, data_size);
+  status = soup_session_send_message (session, msg);
+
+  g_debug ("calling api result %d", status);
+
+  g_object_unref (msg);
+  g_object_unref (session);
+
   return;
 }
 
@@ -361,6 +371,7 @@ hwangsae_recorder_agent_dispose (GObject * object)
   g_clear_object (&self->settings);
   g_clear_object (&self->manager);
   g_clear_object (&self->recorder_interface);
+  g_clear_object (&self->hwangsae_http_server);
 
   G_OBJECT_CLASS (hwangsae_recorder_agent_parent_class)->dispose (object);
 }
@@ -388,11 +399,19 @@ signal_handler (GApplication * app)
 static void
 hwangsae_recorder_agent_init (HwangsaeRecorderAgent * self)
 {
+  g_autofree gchar *recording_dir;
+
   self->is_recording = FALSE;
 
   self->settings = g_settings_new (HWANGSAE_RECORDER_SCHEMA_ID);
 
+  recording_dir = g_settings_get_string (self->settings, "recording-dir");
+
   self->recorder = hwangsae_recorder_new ();
+
+  self->hwangsae_http_server = hwangsae_http_server_new ();
+  hwangsae_http_server_set_recording_dir (self->hwangsae_http_server,
+      recording_dir);
 
   self->manager = hwangsae1_dbus_manager_skeleton_new ();
 
