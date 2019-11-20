@@ -67,6 +67,7 @@ struct _HwangsaeRelay
 
   guint sink_port;
   guint source_port;
+  gchar *external_ip;
 
   gchar *sink_uri;
   gchar *source_uri;
@@ -95,6 +96,7 @@ enum
 {
   PROP_SINK_PORT = 1,
   PROP_SOURCE_PORT,
+  PROP_EXTERNAL_IP,
   PROP_LAST
 };
 
@@ -164,6 +166,12 @@ hwangsae_relay_set_property (GObject * object, guint prop_id,
     case PROP_SOURCE_PORT:
       self->source_port = g_value_get_uint (value);
       break;
+    case PROP_EXTERNAL_IP:
+      g_clear_pointer (&self->sink_uri, g_free);
+      g_clear_pointer (&self->source_uri, g_free);
+      g_clear_pointer (&self->external_ip, g_free);
+      self->external_ip = g_strdup (g_value_get_string (value));
+      break;
     default:
       G_OBJECT_WARN_INVALID_PROPERTY_ID (object, prop_id, pspec);
   }
@@ -180,6 +188,9 @@ hwangsae_relay_get_property (GObject * object, guint prop_id,
       break;
     case PROP_SOURCE_PORT:
       g_value_set_uint (value, self->source_port);
+      break;
+    case PROP_EXTERNAL_IP:
+      g_value_set_string (value, self->external_ip);
       break;
     default:
       G_OBJECT_WARN_INVALID_PROPERTY_ID (object, prop_id, pspec);
@@ -266,6 +277,12 @@ hwangsae_relay_class_init (HwangsaeRelayClass * klass)
       g_param_spec_uint ("source-port", "SRT Binding port (to) ",
           "SRT Binding port (to)", 0, G_MAXUINT, 9999,
           G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS));
+
+  g_object_class_install_property (gobject_class, PROP_EXTERNAL_IP,
+      g_param_spec_string ("external-ip", "Relay external IP",
+          "When set, the relay will use this IP address in its source and sink "
+          "URIs. Otherwise, the first available non-loopback IP is used",
+          NULL, G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS));
 }
 
 static void
@@ -555,9 +572,16 @@ _get_local_ip (void)
 }
 
 static gchar *
-_make_uri_with_port (guint port)
+hwangsae_relay_make_uri (HwangsaeRelay * self, guint port)
 {
-  g_autofree gchar *ip = _get_local_ip ();
+  g_autofree gchar *local_ip = NULL;
+  const gchar *ip;
+
+  if (self->external_ip) {
+    ip = self->external_ip;
+  } else {
+    ip = local_ip = _get_local_ip ();
+  }
 
   return g_strdup_printf ("srt://%s:%d", ip, port);
 }
@@ -566,7 +590,7 @@ const gchar *
 hwangsae_relay_get_sink_uri (HwangsaeRelay * self)
 {
   if (!self->sink_uri) {
-    self->sink_uri = _make_uri_with_port (self->sink_port);
+    self->sink_uri = hwangsae_relay_make_uri (self, self->sink_port);
   }
 
   return self->sink_uri;
@@ -576,7 +600,7 @@ const gchar *
 hwangsae_relay_get_source_uri (HwangsaeRelay * self)
 {
   if (!self->source_uri) {
-    self->source_uri = _make_uri_with_port (self->source_port);
+    self->source_uri = hwangsae_relay_make_uri (self, self->source_port);
   }
 
   return self->source_uri;

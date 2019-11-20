@@ -39,6 +39,26 @@ test_relay_instance (void)
   g_assert_cmpint (source_port, ==, 9999);
 }
 
+static void
+test_external_ip (void)
+{
+  static const gchar *EXTERNAL_IP = "10.1.2.3";
+  g_autoptr (HwangsaeRelay) relay = hwangsae_relay_new ();
+  g_autofree gchar *sink_uri = NULL;
+  g_autofree gchar *source_uri = NULL;
+  guint sink_port, source_port;
+
+  g_object_set (relay, "external-ip", EXTERNAL_IP, NULL);
+  g_object_get (relay, "sink-port", &sink_port, "source-port", &source_port,
+      NULL);
+
+  sink_uri = g_strdup_printf ("srt://%s:%d", EXTERNAL_IP, sink_port);
+  source_uri = g_strdup_printf ("srt://%s:%d", EXTERNAL_IP, source_port);
+
+  g_assert_cmpstr (hwangsae_relay_get_sink_uri (relay), ==, sink_uri);
+  g_assert_cmpstr (hwangsae_relay_get_source_uri (relay), ==, source_uri);
+}
+
 typedef struct
 {
   const gchar *source_uri;
@@ -195,6 +215,7 @@ main (int argc, char *argv[])
   g_log_set_always_fatal (G_LOG_FATAL_MASK | G_LOG_LEVEL_CRITICAL);
 
   g_test_add_func ("/hwangsae/relay-instance", test_relay_instance);
+  g_test_add_func ("/hwangsae/relay-external-ip", test_external_ip);
   g_test_add_func ("/hwangsae/relay-1-to-n", test_1_to_n);
   g_test_add_func ("/hwangsae/relay-m-to-n", test_m_to_n);
 
