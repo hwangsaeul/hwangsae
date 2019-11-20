@@ -30,7 +30,7 @@ hwangsae_enums = gnome.mkenums_simple(
   header_prefix: '#include <hwangsae/types.h>',
   sources: source_h,
   decorator: 'HWANGSAE_API_EXPORT',
-  install_dir: hwangsae_install_header_subdir,
+  install_dir: join_paths(get_option('includedir'), hwangsae_install_header_subdir),
   install_header: true,
 )
 
