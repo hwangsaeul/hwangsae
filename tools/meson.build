@@ -8,7 +8,7 @@ tools_c_args = [
 ]
 
 foreach tool: tools
-  exe_name = '@0@-@1@'.format(tool, apiversion)
+  exe_name = 'hwangsae-@0@-@1@'.format(tool, apiversion)
   src_file = '@0@.c'.format(tool)
 
   executable(exe_name,
