@@ -1,3 +1,5 @@
+pkg = import('pkgconfig')
+
 hwangsae_install_header_subdir = join_paths(hwangsae_api_name, 'hwangsae')
 
 configure_file(output: 'config.h', configuration: cdata)
@@ -49,6 +51,15 @@ libhwangsae = library(
   c_args: hwangsae_c_args,
   link_args: common_ldflags,
   install: true
+)
+
+pkg.generate(libhwangsae,
+  libraries : [ gaeguli_dep, chamge_dep, libsrt_dep ],
+  name : meson.project_name(),
+  description : 'A SRT Relay and Recording Library',
+  filebase : hwangsae_api_name,
+  subdirs: hwangsae_api_name,
+  variables: 'exec_prefix=${prefix}'
 )
 
 libhwangsae_dep = declare_dependency(link_with: libhwangsae,
