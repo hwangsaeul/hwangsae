@@ -173,6 +173,39 @@ hwangsae_relay_agent_edge_interface_handle_stop (Hwangsae1DBusEdgeInterface *
   return TRUE;
 }
 
+static gboolean
+hwangsae_relay_agent_edge_interface_handle_change_parameters (
+    Hwangsae1DBusEdgeInterface * object, GDBusMethodInvocation * invocation,
+    gchar * arg_id, gint arg_width, gint arg_height, gint arg_fps,
+    gpointer user_data)
+{
+  ChamgeReturn ret = CHAMGE_RETURN_OK;
+  g_autofree gchar *cmd = NULL;
+  g_autofree gchar *response = NULL;
+  GError *error = NULL;
+  HwangsaeRelayAgent *self = (HwangsaeRelayAgent *) user_data;
+
+  cmd =
+      g_strdup_printf
+      ("{\"to\":\"%s\",\"method\":\"streamingChangeParameters\", "
+      "\"params\": {\"width\":%d, \"height\":%d, \"fps\": %d}}",
+      arg_id, arg_width, arg_height, arg_fps);
+
+  g_debug ("%s, cmd %s", __func__, cmd);
+
+  ret =
+      chamge_node_user_command (CHAMGE_NODE (self->chamge_hub), cmd,
+      &response, &error);
+
+  if (ret != CHAMGE_RETURN_OK) {
+    g_debug ("failed to send user command >> %s\n", error->message);
+  }
+
+  hwangsae1_dbus_edge_interface_complete_change_parameters (object, invocation);
+
+  return TRUE;
+}
+
 static void
 hwangsae_relay_agent_dispose (GObject * object)
 {
@@ -238,6 +271,10 @@ hwangsae_relay_agent_init (HwangsaeRelayAgent * self)
 
   g_signal_connect (self->edge_interface, "handle-stop",
       G_CALLBACK (hwangsae_relay_agent_edge_interface_handle_stop), self);
+
+  g_signal_connect (self->edge_interface, "handle-change-parameters",
+      G_CALLBACK (hwangsae_relay_agent_edge_interface_handle_change_parameters),
+      self);
 }
 
 int

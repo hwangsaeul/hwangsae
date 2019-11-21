@@ -53,6 +53,22 @@
     </method>
 
     <!--
+    ChangeParameters:
+    @id:        a unique edge ID
+    @width:     image pixel width
+    @height:    image pixel height
+    @fps:       video framerate
+
+    Changes parameters of video stream from @id. 
+    -->
+    <method name="ChangeParameters">
+      <arg name="id" direction="in" type="s"/>
+      <arg name="width" direction="in" type="i"/>
+      <arg name="height" direction="in" type="i"/>
+      <arg name="fps" direction="in" type="i"/>
+    </method>
+
+    <!--
     GetEdgeStatus:
     @id:        an unique id of edge
     @state:     0 = None, 1 = Ready, 2 = Streaming
