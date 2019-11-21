@@ -384,18 +384,14 @@ static void
 hwangsae_recorder_init (HwangsaeRecorder * self)
 {
   HwangsaeRecorderPrivate *priv = hwangsae_recorder_get_instance_private (self);
+  g_autofree gchar *dir = NULL;
 
   priv->settings = g_settings_new ("org.hwangsaeul.hwangsae.recorder");
 
-  g_settings_bind (priv->settings, "recording-dir", self, "recording-dir",
-      G_SETTINGS_BIND_DEFAULT);
-
   priv->record_id = -ENOENT;
 
-  if (g_str_equal (priv->recording_dir, "")) {
-    g_autofree gchar *dir = g_build_filename (g_get_user_data_dir (),
-        "hwangsaeul", "hwangsae", "recordings", NULL);
+  dir = g_build_filename (g_get_user_data_dir (),
+      "hwangsaeul", "hwangsae", "recordings", NULL);
 
-    g_object_set (self, "recording-dir", dir, NULL);
-  }
+  g_object_set (self, "recording-dir", dir, NULL);
 }

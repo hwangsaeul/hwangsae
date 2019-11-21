@@ -115,6 +115,7 @@ hwangsae_recorder_agent_start_recording (HwangsaeRecorderAgent * self,
   guint port = g_settings_get_uint (self->settings, "relay-stream-port");
   g_autofree gchar *streamid = NULL;
   g_autofree gchar *url = NULL;
+  g_autofree gchar *recording_edge_dir = NULL;
 
   if (self->is_recording) {
     g_warning ("recording already started");
@@ -126,12 +127,25 @@ hwangsae_recorder_agent_start_recording (HwangsaeRecorderAgent * self,
   hwangsae_recorder_agent_send_rest_api (self, RELAY_METHOD_START_STREAMING,
       edge_id);
 
-
   streamid = g_strdup_printf ("#!::r=%s", edge_id);
   streamid = g_uri_escape_string (streamid, NULL, FALSE);
   url = g_strdup_printf ("srt://%s:%d?streamid=%s", host, port, streamid);
 
   g_debug ("starting to recording stream from %s", url);
+
+  g_autofree gchar *recording_dir =
+      g_settings_get_string (self->settings, "recording-dir");
+  if (g_str_equal (recording_dir, "")) {
+    g_free (recording_dir);
+    recording_dir = g_build_filename (g_get_user_data_dir (),
+        "hwangsaeul", "hwangsae", "recordings", NULL);
+  }
+
+  recording_edge_dir = g_build_filename (recording_dir, edge_id, NULL);
+
+  g_debug ("setting recording_dir: %s\n", recording_edge_dir);
+
+  g_object_set (self->recorder, "recording-dir", recording_edge_dir, NULL);
 
   return hwangsae_recorder_start_recording (self->recorder, url);
 }
