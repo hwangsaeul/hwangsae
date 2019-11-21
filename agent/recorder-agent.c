@@ -333,18 +333,75 @@ gchar_compare (gconstpointer a, gconstpointer b)
   return g_strcmp0 (str_a, str_b);
 }
 
+static void
+get_records (gchar * recording_dir, gchar * arg_edge_id, gchar * arg_record_id,
+    gint64 arg_from, gint64 arg_to, GArray * record_array)
+{
+  GDir *dir = NULL;
+  GDir *subdir = NULL;
+  GError *error = NULL;
+  const gchar *filename = NULL;
+  gchar *edge_id = NULL;
+  gchar *record_id = NULL;
+  gchar *recording_edge_dir = NULL;
+
+  dir = g_dir_open (recording_dir, 0, &error);
+  if (error) {
+    g_dir_close (dir);
+    g_error_free (error);
+    return;
+  }
+
+  while ((filename = g_dir_read_name (dir))) {
+    g_clear_pointer (&edge_id, g_free);
+    edge_id = strdup (filename);
+    g_clear_pointer (&recording_edge_dir, g_free);
+    recording_edge_dir = g_build_filename (recording_dir, filename, NULL);
+    if (arg_edge_id && g_strcmp0 (arg_edge_id, "")
+        && g_strcmp0 (arg_edge_id, edge_id))
+      continue;
+    if (!g_file_test (recording_edge_dir, G_FILE_TEST_IS_DIR))
+      continue;
+    if (subdir) {
+      g_dir_close (subdir);
+      subdir = NULL;
+    }
+    if (error) {
+      g_error_free (error);
+      error = NULL;
+    }
+    subdir = g_dir_open (recording_edge_dir, 0, &error);
+    if (error)
+      continue;
+    while ((filename = g_dir_read_name (subdir))) {
+      gchar *record_id = check_filename (filename, arg_from, arg_to);
+      if (!record_id)
+        continue;
+      if (arg_record_id && g_strcmp0 (arg_record_id, "")
+          && g_strcmp0 (arg_record_id, record_id))
+        continue;
+      g_array_append_val (record_array, record_id);
+    }
+  }
+
+  if (dir)
+    g_dir_close (dir);
+  if (subdir)
+    g_dir_close (subdir);
+  g_clear_pointer (&edge_id, g_free);
+  g_clear_pointer (&record_id, g_free);
+  g_clear_pointer (&recording_edge_dir, g_free);
+}
+
 gboolean
     hwangsae_recorder_agent_recorder_interface_handle_lookup_by_record
     (Hwangsae1DBusRecorderInterface * object,
-    GDBusMethodInvocation * invocation, gchar * arg_id, gint64 arg_from,
+    GDBusMethodInvocation * invocation, gchar * arg_record_id, gint64 arg_from,
     gint64 arg_to, gpointer user_data) {
   HwangsaeRecorderAgent *self = (HwangsaeRecorderAgent *) user_data;
   g_autofree gchar *cmd = NULL;
   g_autofree gchar *response = NULL;
-  g_autofree gchar *recording_dir = NULL;
-  GDir *dir;
-  GError *error;
-  const gchar *filename;
+  g_autofree gchar *recording_dir;
   g_autofree gchar **records;
   GArray *record_array;
 
@@ -355,15 +412,8 @@ gboolean
 
   recording_dir = g_settings_get_string (self->settings, "recording-dir");
 
-  dir = g_dir_open (recording_dir, 0, &error);
-  while ((filename = g_dir_read_name (dir))) {
-    gchar *record_id = check_filename (filename, arg_from, arg_to);
-    if (record_id) {
-      if (!arg_id || !g_strcmp0 (arg_id, "") || (arg_id
-              && !g_strcmp0 (arg_id, record_id)))
-        g_array_append_val (record_array, record_id);
-    }
-  }
+  get_records (recording_dir, NULL, arg_record_id, arg_from, arg_to,
+      record_array);
 
   g_array_sort (record_array, gchar_compare);
 
@@ -383,7 +433,6 @@ gboolean
     g_free (*(records + i));
   }
 
-  g_dir_close (dir);
   g_array_free (record_array, TRUE);
   return TRUE;
 }
