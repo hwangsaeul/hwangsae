@@ -37,5 +37,18 @@
       <arg name="records" direction="out" type="as"/>
     </method>
 
+    <!--
+    Lookup-by-edge:
+    @recordId:        an unique id of record
+
+    Lookup by record or range from-to
+    -->
+    <method name="LookupByEdge">
+      <arg name="edgeId" direction="in" type="s"/>
+      <arg name="from" direction="in" type="x"/>
+      <arg name="to" direction="in" type="x"/>
+      <arg name="records" direction="out" type="as"/>
+    </method>
+
   </interface>
 </node>
