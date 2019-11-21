@@ -34,7 +34,8 @@
       <arg name="recordId" direction="in" type="s"/>
       <arg name="from" direction="in" type="x"/>
       <arg name="to" direction="in" type="x"/>
-      <arg name="records" direction="out" type="as"/>
+      <arg name="edgeId" direction="out" type="s"/>
+      <arg name="records" direction="out" type="a(sxxx)"/>
     </method>
 
     <!--
@@ -47,7 +48,7 @@
       <arg name="edgeId" direction="in" type="s"/>
       <arg name="from" direction="in" type="x"/>
       <arg name="to" direction="in" type="x"/>
-      <arg name="records" direction="out" type="as"/>
+      <arg name="records" direction="out" type="a(ssxxx)"/>
     </method>
 
   </interface>
