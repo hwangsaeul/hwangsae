@@ -287,39 +287,40 @@ find_chr (const gchar * str, gchar c)
 gchar *
 check_filename (const gchar * fn, gint64 from, gint64 to)
 {
-  gint start, stop, len, pos;
   g_autofree gchar *tmp = NULL;
-  gchar *time;
-  g_autofree gchar *subtime = NULL;
+  gchar *time = NULL;
+  gchar *subtime = NULL;
+  gchar **parts = NULL;
   gint64 time2 = 0;
 
-  start = 0;
-  stop = 0;
-  if (!g_str_has_prefix (fn, "hwangsae-recording-"))
-    return NULL;
-  start = 19;
-  if (g_str_has_suffix (fn, ".mp4"))
-    stop = 4;
-  if (g_str_has_suffix (fn, ".ts"))
-    stop = 3;
-  len = strlen (fn) - start - stop;
-  tmp = g_strndup (fn + start, len);
+  parts = g_strsplit (fn, ".", -1);
+  if (!(parts[0] && parts[1]))
+    goto cleanup;
 
-  pos = find_chr (tmp, '-');
+  tmp = g_strdup (parts[0]);
 
-  if (pos != -1) {
-    time = g_strndup (tmp, pos);
-    len = strlen (tmp) - pos;
-    subtime = g_strndup (tmp + pos + 1, len);
-  } else {
-    time = g_strdup (tmp);
-    subtime = NULL;
-  }
+  g_strfreev (parts);
+
+  parts = g_strsplit (tmp, "-", -1);
+  if (!parts[0] || g_strcmp0 (parts[0], "hwangsae"))
+    goto cleanup;
+  if (!parts[1] || g_strcmp0 (parts[1], "recording"))
+    goto cleanup;
+  if (!parts[2] || !parts[3])
+    goto cleanup;
+
+  time = g_strdup (parts[2]);
+  subtime = g_strdup (parts[3]);
 
   time2 = g_ascii_strtoll (time, NULL, 10);
-  if ((from > 0 && time2 < from) || (to > 0 && time2 > to))
-    return NULL;
+  if ((from > 0 && time2 < from) || (to > 0 && time2 > to)) {
+    g_free (time);
+    time = NULL;
+  }
 
+cleanup:
+  g_strfreev (parts);
+  g_free (subtime);
   return time;
 }
 
