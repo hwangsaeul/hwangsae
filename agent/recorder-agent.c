@@ -437,6 +437,49 @@ gboolean
   return TRUE;
 }
 
+gboolean
+    hwangsae_recorder_agent_recorder_interface_handle_lookup_by_edge
+    (Hwangsae1DBusRecorderInterface * object,
+    GDBusMethodInvocation * invocation, gchar * arg_edge_id, gint64 arg_from,
+    gint64 arg_to, gpointer user_data) {
+  HwangsaeRecorderAgent *self = (HwangsaeRecorderAgent *) user_data;
+  g_autofree gchar *cmd = NULL;
+  g_autofree gchar *response = NULL;
+  g_autofree gchar *recording_dir;
+  g_autofree gchar **records;
+  GArray *record_array;
+
+  record_array = g_array_new (TRUE, TRUE, sizeof (gchar *));
+
+  g_debug ("hwangsae_recorder_agent_recorder_interface_handle_lookup_by_edge");
+
+  recording_dir = g_settings_get_string (self->settings, "recording-dir");
+
+  get_records (recording_dir, arg_edge_id, NULL, arg_from, arg_to,
+      record_array);
+
+  g_array_sort (record_array, gchar_compare);
+
+  records = (gchar **) g_malloc (sizeof (gchar *) * record_array->len + 1);
+
+  for (gint i = 0; i < record_array->len; i++) {
+    *(records + i) = g_strdup (g_array_index (record_array, gchar *, i));
+  }
+
+  *(records + record_array->len) = 0;
+
+  hwangsae1_dbus_recorder_interface_complete_lookup_by_record (object,
+      invocation, (const char *const *) records);
+
+  for (gint i = 0; i < record_array->len; i++) {
+    g_free (g_array_index (record_array, gchar *, i));
+    g_free (*(records + i));
+  }
+
+  g_array_free (record_array, TRUE);
+  return TRUE;
+}
+
 static void
 hwangsae_recorder_agent_dispose (GObject * object)
 {
@@ -506,6 +549,10 @@ hwangsae_recorder_agent_init (HwangsaeRecorderAgent * self)
       G_CALLBACK
       (hwangsae_recorder_agent_recorder_interface_handle_lookup_by_record),
       self);
+
+  g_signal_connect (self->recorder_interface, "handle-lookup-by-edge",
+      G_CALLBACK
+      (hwangsae_recorder_agent_recorder_interface_handle_lookup_by_edge), self);
 
   hwangsae_recorder_set_container (self->recorder, HWANGSAE_CONTAINER_TS);
 }
