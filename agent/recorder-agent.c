@@ -21,6 +21,7 @@
 #include "recorder-agent.h"
 #include "http-server.h"
 #include <hwangsae/recorder.h>
+#include <glib/gstdio.h>
 #include <gst/gst.h>
 #include <libsoup/soup.h>
 #include <libsoup/soup-message.h>
@@ -284,14 +285,18 @@ find_chr (const gchar * str, gchar c)
   return pos;
 }
 
-gchar *
-check_filename (const gchar * fn, gint64 from, gint64 to)
+static void
+check_filename (const gchar * fn, gint64 from, gint64 to, gchar ** record_id,
+    gchar ** file_id)
 {
   g_autofree gchar *tmp = NULL;
-  gchar *time = NULL;
-  gchar *subtime = NULL;
+  g_autofree gchar *time = NULL;
+  g_autofree gchar *subtime = NULL;
   gchar **parts = NULL;
   gint64 time2 = 0;
+
+  *record_id = NULL;
+  *file_id = NULL;
 
   parts = g_strsplit (fn, ".", -1);
   if (!(parts[0] && parts[1]))
@@ -313,15 +318,14 @@ check_filename (const gchar * fn, gint64 from, gint64 to)
   subtime = g_strdup (parts[3]);
 
   time2 = g_ascii_strtoll (time, NULL, 10);
-  if ((from > 0 && time2 < from) || (to > 0 && time2 > to)) {
-    g_free (time);
-    time = NULL;
-  }
+  if ((from > 0 && time2 < from) || (to > 0 && time2 > to))
+    goto cleanup;
+
+  *record_id = g_strdup (time);
+  *file_id = g_strdup (subtime);
 
 cleanup:
   g_strfreev (parts);
-  g_free (subtime);
-  return time;
 }
 
 gint
@@ -333,9 +337,9 @@ gchar_compare (gconstpointer a, gconstpointer b)
   return g_strcmp0 (str_a, str_b);
 }
 
-static void
+static gchar *
 get_records (gchar * recording_dir, gchar * arg_edge_id, gchar * arg_record_id,
-    gint64 arg_from, gint64 arg_to, GArray * record_array)
+    gint64 arg_from, gint64 arg_to, GVariantBuilder * builder)
 {
   GDir *dir = NULL;
   GDir *subdir = NULL;
@@ -343,16 +347,20 @@ get_records (gchar * recording_dir, gchar * arg_edge_id, gchar * arg_record_id,
   const gchar *filename = NULL;
   gchar *edge_id = NULL;
   gchar *record_id = NULL;
+  gchar *file_id = NULL;
   gchar *recording_edge_dir = NULL;
+  gboolean records_found = FALSE;
+  GStatBuf st;
+  gchar *filename_full = NULL;
 
   dir = g_dir_open (recording_dir, 0, &error);
   if (error) {
     g_dir_close (dir);
     g_error_free (error);
-    return;
+    return NULL;
   }
 
-  while ((filename = g_dir_read_name (dir))) {
+  while ((filename = g_dir_read_name (dir)) && !records_found) {
     g_clear_pointer (&edge_id, g_free);
     edge_id = strdup (filename);
     g_clear_pointer (&recording_edge_dir, g_free);
@@ -374,13 +382,27 @@ get_records (gchar * recording_dir, gchar * arg_edge_id, gchar * arg_record_id,
     if (error)
       continue;
     while ((filename = g_dir_read_name (subdir))) {
-      gchar *record_id = check_filename (filename, arg_from, arg_to);
-      if (!record_id)
+      g_clear_pointer (&record_id, g_free);
+      g_clear_pointer (&file_id, g_free);
+      check_filename (filename, arg_from, arg_to, &record_id, &file_id);
+      if (!record_id || !file_id)
         continue;
+
       if (arg_record_id && g_strcmp0 (arg_record_id, "")
           && g_strcmp0 (arg_record_id, record_id))
         continue;
-      g_array_append_val (record_array, record_id);
+      records_found = TRUE;
+
+      g_clear_pointer (&filename_full, g_free);
+      filename_full = g_build_filename (recording_edge_dir, filename, NULL);
+      g_stat (filename_full, &st);
+
+      if (!arg_edge_id)
+        g_variant_builder_add (builder, "(sxxx)", g_strdup (record_id), 0, 0,
+            st.st_size);
+      else if (!arg_record_id)
+        g_variant_builder_add (builder, "(ssxxx)", g_strdup (record_id),
+            g_strdup (file_id), 0, 0, st.st_size);
     }
   }
 
@@ -388,9 +410,15 @@ get_records (gchar * recording_dir, gchar * arg_edge_id, gchar * arg_record_id,
     g_dir_close (dir);
   if (subdir)
     g_dir_close (subdir);
-  g_clear_pointer (&edge_id, g_free);
   g_clear_pointer (&record_id, g_free);
+  g_clear_pointer (&file_id, g_free);
   g_clear_pointer (&recording_edge_dir, g_free);
+  g_clear_pointer (&filename_full, g_free);
+
+  if (error)
+    g_error_free (error);
+
+  return edge_id;
 }
 
 gboolean
@@ -402,38 +430,27 @@ gboolean
   g_autofree gchar *cmd = NULL;
   g_autofree gchar *response = NULL;
   g_autofree gchar *recording_dir;
-  g_autofree gchar **records;
-  GArray *record_array;
-
-  record_array = g_array_new (TRUE, TRUE, sizeof (gchar *));
+  g_autofree gchar *edge_id = NULL;
+  GVariantBuilder *builder;
+  GVariant *records;
 
   g_debug
       ("hwangsae_recorder_agent_recorder_interface_handle_lookup_by_record");
 
   recording_dir = g_settings_get_string (self->settings, "recording-dir");
 
-  get_records (recording_dir, NULL, arg_record_id, arg_from, arg_to,
-      record_array);
+  builder = g_variant_builder_new (G_VARIANT_TYPE ("a(sxxx)"));
 
-  g_array_sort (record_array, gchar_compare);
+  edge_id = get_records (recording_dir, NULL, arg_record_id, arg_from, arg_to,
+      builder);
 
-  records = (gchar **) g_malloc (sizeof (gchar *) * record_array->len + 1);
+  records = g_variant_new ("a(sxxx)", builder);
 
-  for (gint i = 0; i < record_array->len; i++) {
-    *(records + i) = g_strdup (g_array_index (record_array, gchar *, i));
-  }
-
-  *(records + record_array->len) = 0;
+  g_variant_builder_unref (builder);
 
   hwangsae1_dbus_recorder_interface_complete_lookup_by_record (object,
-      invocation, (const char *const *) records);
+      invocation, edge_id, records);
 
-  for (gint i = 0; i < record_array->len; i++) {
-    g_free (g_array_index (record_array, gchar *, i));
-    g_free (*(records + i));
-  }
-
-  g_array_free (record_array, TRUE);
   return TRUE;
 }
 
@@ -445,38 +462,27 @@ gboolean
   HwangsaeRecorderAgent *self = (HwangsaeRecorderAgent *) user_data;
   g_autofree gchar *cmd = NULL;
   g_autofree gchar *response = NULL;
-  g_autofree gchar *recording_dir;
-  g_autofree gchar **records;
-  GArray *record_array;
-
-  record_array = g_array_new (TRUE, TRUE, sizeof (gchar *));
+  g_autofree gchar *recording_dir = NULL;
+  g_autofree gchar *edge_id = NULL;
+  GVariantBuilder *builder;
+  GVariant *records;
 
   g_debug ("hwangsae_recorder_agent_recorder_interface_handle_lookup_by_edge");
 
   recording_dir = g_settings_get_string (self->settings, "recording-dir");
 
-  get_records (recording_dir, arg_edge_id, NULL, arg_from, arg_to,
-      record_array);
+  builder = g_variant_builder_new (G_VARIANT_TYPE ("a(ssxxx)"));
 
-  g_array_sort (record_array, gchar_compare);
+  edge_id = get_records (recording_dir, arg_edge_id, NULL, arg_from, arg_to,
+      builder);
 
-  records = (gchar **) g_malloc (sizeof (gchar *) * record_array->len + 1);
+  records = g_variant_new ("a(ssxxx)", builder);
 
-  for (gint i = 0; i < record_array->len; i++) {
-    *(records + i) = g_strdup (g_array_index (record_array, gchar *, i));
-  }
+  g_variant_builder_unref (builder);
 
-  *(records + record_array->len) = 0;
+  hwangsae1_dbus_recorder_interface_complete_lookup_by_edge (object,
+      invocation, records);
 
-  hwangsae1_dbus_recorder_interface_complete_lookup_by_record (object,
-      invocation, (const char *const *) records);
-
-  for (gint i = 0; i < record_array->len; i++) {
-    g_free (g_array_index (record_array, gchar *, i));
-    g_free (*(records + i));
-  }
-
-  g_array_free (record_array, TRUE);
   return TRUE;
 }
 
