@@ -309,6 +309,15 @@ check_filename (const gchar * fn, gint64 from, gint64 to)
   return time;
 }
 
+gint
+gchar_compare (gconstpointer a, gconstpointer b)
+{
+  gchar *str_a = *(gchar **) a;
+  gchar *str_b = *(gchar **) b;
+
+  return g_strcmp0 (str_a, str_b);
+}
+
 gboolean
     hwangsae_recorder_agent_recorder_interface_handle_lookup_by_record
     (Hwangsae1DBusRecorderInterface * object,
@@ -340,6 +349,8 @@ gboolean
         g_array_append_val (record_array, record_id);
     }
   }
+
+  g_array_sort (record_array, gchar_compare);
 
   records = (gchar **) g_malloc (sizeof (gchar *) * record_array->len + 1);
 
