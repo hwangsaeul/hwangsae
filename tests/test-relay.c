@@ -215,9 +215,9 @@ main (int argc, char *argv[])
   g_log_set_always_fatal (G_LOG_FATAL_MASK | G_LOG_LEVEL_CRITICAL);
 
   g_test_add_func ("/hwangsae/relay-instance", test_relay_instance);
-  g_test_add_func ("/hwangsae/relay-external-ip", test_external_ip);
   g_test_add_func ("/hwangsae/relay-1-to-n", test_1_to_n);
   g_test_add_func ("/hwangsae/relay-m-to-n", test_m_to_n);
+  g_test_add_func ("/hwangsae/relay-external-ip", test_external_ip);
 
   return g_test_run ();
 }

@@ -11,6 +11,14 @@
       <summary>SRT binding port to be a source</summary>
       <description>SRT listening port to acquire stream</description>
     </key>
+    <key name="external-ip" type="s">
+      <default>""</default>
+      <summary>Relay external IP</summary>
+      <description>
+        When set, the relay will use this IP address in its source and sink
+        URIs. Otherwise, the first available non-loopback IP is used.
+      </description>
+    </key>
   </schema>
   <schema id="org.hwangsaeul.hwangsae.recorder" path="/org/hwangsaeul/hwangsae/recorder/">
     <key name="recording-dir" type="s">

@@ -167,11 +167,16 @@ hwangsae_relay_set_property (GObject * object, guint prop_id,
       self->source_port = g_value_get_uint (value);
       break;
     case PROP_EXTERNAL_IP:
+    {
+      const gchar *ip = g_value_get_string (value);
       g_clear_pointer (&self->sink_uri, g_free);
       g_clear_pointer (&self->source_uri, g_free);
       g_clear_pointer (&self->external_ip, g_free);
-      self->external_ip = g_strdup (g_value_get_string (value));
+      if (ip && ip[0] != '\0') {
+        self->external_ip = g_strdup (ip);
+      }
       break;
+    }
     default:
       G_OBJECT_WARN_INVALID_PROPERTY_ID (object, prop_id, pspec);
   }
@@ -493,6 +498,8 @@ hwangsae_relay_init (HwangsaeRelay * self)
   g_settings_bind (self->settings, "sink-port", self, "sink-port",
       G_SETTINGS_BIND_DEFAULT);
   g_settings_bind (self->settings, "source-port", self, "source-port",
+      G_SETTINGS_BIND_DEFAULT);
+  g_settings_bind (self->settings, "external-ip", self, "external-ip",
       G_SETTINGS_BIND_DEFAULT);
 
   self->poll_id = srt_epoll_create ();
