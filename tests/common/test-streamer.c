@@ -101,7 +101,7 @@ hwangsae_test_streamer_start (HwangsaeTestStreamer * self)
   g_assert_null (self->streaming_thread);
 
   gaeguli_pipeline_add_fifo_target_full (self->pipeline,
-      GAEGULI_VIDEO_CODEC_H264, self->resolution,
+      GAEGULI_VIDEO_CODEC_H264, self->resolution, 30, 2048000,
       gaeguli_fifo_transmit_get_fifo (self->transmit), &error);
   g_assert_no_error (error);
 
