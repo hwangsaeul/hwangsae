@@ -22,17 +22,18 @@
 
 #include <glib-object.h>
 
-#define HWANGSAE_TYPE_HTTP_SERVER hwangsae_http_server_get_type()
+G_BEGIN_DECLS
 
-G_DECLARE_FINAL_TYPE (HwangsaeHttpServer, hwangsae_http_server, HWANGSAE, HTTP_SERVER, GObject)
+#define HWANGSAE_TYPE_HTTP_SERVER   (hwangsae_http_server_get_type())
+G_DECLARE_FINAL_TYPE                (HwangsaeHttpServer, hwangsae_http_server, HWANGSAE, HTTP_SERVER, GObject)
 
-HwangsaeHttpServer *
-hwangsae_http_server_new ();
+HwangsaeHttpServer     *hwangsae_http_server_new (void);
 
-gchar *
-hwangsae_http_server_get_recording_dir(HwangsaeHttpServer * server);
+gchar                  *hwangsae_http_server_get_recording_dir (HwangsaeHttpServer *server);
 
-void
-hwangsae_http_server_set_recording_dir(HwangsaeHttpServer * server, gchar *recording_dir);
+void                    hwangsae_http_server_set_recording_dir (HwangsaeHttpServer *server,
+                                                                gchar              *recording_dir);
+
+G_END_DECLS
 
 #endif /* __HWANGSAE_HTTP_SERVER_H__ */
