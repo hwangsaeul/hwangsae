@@ -292,17 +292,16 @@ find_chr (const gchar * str, gchar c)
 }
 
 static void
-check_filename (const gchar * fn, gint64 from, gint64 to, gchar ** record_id,
-    gchar ** file_id)
+parse_filename (const gchar * fn, gchar ** record_id, gint64 * file_start,
+    gint64 * file_end)
 {
   g_autofree gchar *tmp = NULL;
-  g_autofree gchar *time = NULL;
-  g_autofree gchar *subtime = NULL;
+  g_autofree gchar *file_start_str = NULL;
+  g_autofree gchar *file_end_str = NULL;
   gchar **parts = NULL;
-  gint64 time2 = 0;
 
-  *record_id = NULL;
-  *file_id = NULL;
+  *file_start = 0;
+  *file_end = 0;
 
   parts = g_strsplit (fn, ".", -1);
   if (!(parts[0] && parts[1]))
@@ -320,15 +319,12 @@ check_filename (const gchar * fn, gint64 from, gint64 to, gchar ** record_id,
   if (!parts[2] || !parts[3])
     goto cleanup;
 
-  time = g_strdup (parts[2]);
-  subtime = g_strdup (parts[3]);
+  *record_id = g_strdup (parts[2]);
+  file_start_str = g_strdup (parts[3]);
+  file_end_str = g_strdup (parts[4]);
 
-  time2 = g_ascii_strtoll (time, NULL, 10);
-  if ((from > 0 && time2 < from) || (to > 0 && time2 > to))
-    goto cleanup;
-
-  *record_id = g_strdup (time);
-  *file_id = g_strdup (subtime);
+  *file_start = g_ascii_strtoll (file_start_str, NULL, 10);
+  *file_end = g_ascii_strtoll (file_end_str, NULL, 10);
 
 cleanup:
   g_strfreev (parts);
@@ -347,17 +343,11 @@ static gchar *
 get_records (gchar * recording_dir, gchar * arg_edge_id, gchar * arg_record_id,
     gint64 arg_from, gint64 arg_to, GVariantBuilder * builder)
 {
-  GDir *dir = NULL;
-  GDir *subdir = NULL;
-  GError *error = NULL;
+  g_autoptr (GDir) dir = NULL;
+  g_autoptr (GError) error = NULL;
   const gchar *filename = NULL;
   gchar *edge_id = NULL;
-  gchar *record_id = NULL;
-  gchar *file_id = NULL;
-  gchar *recording_edge_dir = NULL;
   gboolean records_found = FALSE;
-  GStatBuf st;
-  gchar *filename_full = NULL;
 
   dir = g_dir_open (recording_dir, 0, &error);
   if (error) {
@@ -367,62 +357,76 @@ get_records (gchar * recording_dir, gchar * arg_edge_id, gchar * arg_record_id,
   }
 
   while ((filename = g_dir_read_name (dir)) && !records_found) {
-    g_clear_pointer (&edge_id, g_free);
-    edge_id = strdup (filename);
-    g_clear_pointer (&recording_edge_dir, g_free);
+    g_autofree gchar *recording_edge_dir = NULL;
+    g_autofree gchar *edge_id_tmp = NULL;
+    g_autoptr (GArray) file_list = NULL;
+    g_autoptr (GDir) subdir = NULL;
+    g_autoptr (GError) error2 = NULL;
+
+    edge_id_tmp = g_strdup (filename);
     recording_edge_dir = g_build_filename (recording_dir, filename, NULL);
     if (arg_edge_id && g_strcmp0 (arg_edge_id, "")
-        && g_strcmp0 (arg_edge_id, edge_id))
+        && g_strcmp0 (arg_edge_id, edge_id_tmp))
       continue;
     if (!g_file_test (recording_edge_dir, G_FILE_TEST_IS_DIR))
       continue;
-    if (subdir) {
-      g_dir_close (subdir);
-      subdir = NULL;
-    }
-    if (error) {
-      g_error_free (error);
-      error = NULL;
-    }
-    subdir = g_dir_open (recording_edge_dir, 0, &error);
-    if (error)
+
+    subdir = g_dir_open (recording_edge_dir, 0, &error2);
+    if (error2)
       continue;
+
+    file_list = g_array_new (TRUE, TRUE, sizeof (gchar *));
     while ((filename = g_dir_read_name (subdir))) {
-      g_clear_pointer (&record_id, g_free);
-      g_clear_pointer (&file_id, g_free);
-      check_filename (filename, arg_from, arg_to, &record_id, &file_id);
-      if (!record_id || !file_id)
+      g_array_append_val (file_list, filename);
+    }
+
+    g_array_sort (file_list, gchar_compare);
+
+    for (gint i = 0; i < file_list->len; i++) {
+      gint64 file_start = 0;
+      gint64 file_end = 0;
+      g_autofree gchar *record_id = NULL;
+      g_autofree gchar *file_id = NULL;
+      g_autofree gchar *filename_full = NULL;
+      GStatBuf st;
+
+      filename = g_array_index (file_list, gchar *, i);
+
+      parse_filename (filename, &record_id, &file_start, &file_end);
+      if (!record_id || file_start <= 0 || file_end <= 0)
         continue;
 
       if (arg_record_id && g_strcmp0 (arg_record_id, "")
           && g_strcmp0 (arg_record_id, record_id))
         continue;
+
       records_found = TRUE;
 
-      g_clear_pointer (&filename_full, g_free);
+      file_id = g_strdup_printf ("%s-%ld-%ld", record_id, file_start, file_end);
+
       filename_full = g_build_filename (recording_edge_dir, filename, NULL);
       g_stat (filename_full, &st);
 
-      if (!arg_edge_id)
-        g_variant_builder_add (builder, "(sxxx)", g_strdup (record_id), 0, 0,
-            st.st_size);
-      else if (!arg_record_id)
-        g_variant_builder_add (builder, "(ssxxx)", g_strdup (record_id),
-            g_strdup (file_id), 0, 0, st.st_size);
+      if (arg_to == 0)
+        arg_to = G_MAXINT64;
+
+      if (!(file_end < arg_from || file_start > arg_to)) {
+
+        if (!edge_id)
+          edge_id = g_strdup (edge_id_tmp);
+
+        if (!arg_edge_id)
+          g_variant_builder_add (builder, "(sxxx)", g_strdup (file_id),
+              file_start, file_end, st.st_size);
+        else if (!arg_record_id)
+          g_variant_builder_add (builder, "(ssxxx)", g_strdup (record_id),
+              g_strdup (file_id), file_start, file_end, st.st_size);
+      }
     }
   }
 
-  if (dir)
-    g_dir_close (dir);
-  if (subdir)
-    g_dir_close (subdir);
-  g_clear_pointer (&record_id, g_free);
-  g_clear_pointer (&file_id, g_free);
-  g_clear_pointer (&recording_edge_dir, g_free);
-  g_clear_pointer (&filename_full, g_free);
-
-  if (error)
-    g_error_free (error);
+  if (!edge_id)
+    edge_id = g_strdup ("");
 
   return edge_id;
 }
