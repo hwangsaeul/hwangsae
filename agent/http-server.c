@@ -70,28 +70,32 @@ hwangsae_http_server_set_recording_dir (HwangsaeHttpServer * server,
 }
 
 static gchar *
-get_file_path (gchar * base_path, gchar * record_id, gchar * ext)
+get_file_path (gchar * base_path, gchar * file_id, gchar * ext)
 {
+  g_autofree gchar *filename = NULL;
   gchar *file_path;
 
-  file_path =
-      g_strdup_printf ("%s/hwangsae-recording-%s-00000.%s", base_path,
-      record_id, ext);
+  filename = g_strdup_printf ("hwangsae-recording-%s.%s", file_id, ext);
+
+  file_path = g_build_filename (base_path, filename, NULL);
 
   return file_path;
 }
 
-gchar *
-check_file_path (gchar * base_path, gchar * record_id)
+static gchar *
+check_file_path (HwangsaeHttpServer * server, gchar * edge_id, gchar * file_id)
 {
+  g_autofree gchar *recording_edge_dir;
   gchar *file_path;
 
-  file_path = get_file_path (base_path, record_id, "ts");
+  recording_edge_dir = g_build_filename (server->recording_dir, edge_id, NULL);
+
+  file_path = get_file_path (recording_edge_dir, file_id, "ts");
   if (g_file_test (file_path, G_FILE_TEST_EXISTS))
     return file_path;
 
   g_free (file_path);
-  file_path = get_file_path (base_path, record_id, "mp4");
+  file_path = get_file_path (recording_edge_dir, file_id, "mp4");
   if (g_file_test (file_path, G_FILE_TEST_EXISTS))
     return file_path;
 
@@ -105,12 +109,16 @@ http_cb (SoupServer * server, SoupMessage * msg, const char *path,
     GHashTable * query, SoupClientContext * client, gpointer user_data)
 {
   HwangsaeHttpServer *self = HWANGSAE_HTTP_SERVER (user_data);
-  g_autofree gchar *record_id = NULL;
+  g_autofree gchar *edge_id = NULL;
+  g_autofree gchar *file_id = NULL;
+  g_autofree gchar *recording_edge_dir = NULL;
   g_autofree gchar *file_path = NULL;
   GMappedFile *mapping;
   GStatBuf st;
   SoupBuffer *buffer;
   GError *err = NULL;
+  gchar **parts;
+  guint parts_len;
 
   if (msg->method != SOUP_METHOD_GET) {
     soup_message_set_status (msg, SOUP_STATUS_INTERNAL_SERVER_ERROR);
@@ -119,15 +127,30 @@ http_cb (SoupServer * server, SoupMessage * msg, const char *path,
 
   g_debug ("request path: %s", path);
 
-  record_id = g_strdup (path + 1);
+  parts = g_strsplit (path, "/", -1);
 
-  file_path = check_file_path (self->recording_dir, record_id);
+  parts_len = g_strv_length (parts);
+
+  g_debug ("request parts_len: %d", parts_len);
+
+  if (parts_len != 3) {
+    g_strfreev (parts);
+    soup_message_set_status (msg, SOUP_STATUS_NOT_FOUND);
+    return;
+  }
+
+  edge_id = g_strdup (parts[1]);
+  file_id = g_strdup (parts[2]);
+
+  g_strfreev (parts);
+
+  file_path = check_file_path (self, edge_id, file_id);
   if (!file_path) {
     soup_message_set_status (msg, SOUP_STATUS_NOT_FOUND);
     return;
   }
 
-  g_debug ("record_id: %s file: %s", record_id, file_path);
+  g_debug ("file_id: %s file: %s", file_id, file_path);
 
   if (g_stat (file_path, &st) == -1) {
     g_debug ("file %s cannot be accessed", file_path);
