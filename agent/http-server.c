@@ -36,8 +36,12 @@ struct _HwangsaeHttpServer
   gchar *recording_dir;
 };
 
+/* *INDENT-OFF* */
 G_DEFINE_TYPE (HwangsaeHttpServer, hwangsae_http_server, G_TYPE_OBJECT)
-     HwangsaeHttpServer *hwangsae_http_server_new ()
+/* *INDENT-ON* */
+
+HwangsaeHttpServer *
+hwangsae_http_server_new (void)
 {
   return HWANGSAE_HTTP_SERVER (g_object_new (HWANGSAE_TYPE_HTTP_SERVER, NULL));
 }
