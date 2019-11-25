@@ -7,9 +7,6 @@ hwangsae_agent_c_args = [
   '-DHWANGSAE_COMPILATION',
 ]
 
-soup_dep = dependency('libsoup-2.4')
-json_glib_dep = dependency('json-glib-1.0')
-
 executable('hwangsae-relay-agent',
   hwangsae_relay_agent_src,
   install: true,
