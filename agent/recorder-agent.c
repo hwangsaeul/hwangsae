@@ -164,9 +164,6 @@ hwangsae_recorder_agent_stop_recording (HwangsaeRecorderAgent * self,
 
   self->is_recording = FALSE;
 
-  hwangsae_recorder_agent_send_rest_api (self, RELAY_METHOD_STOP_STREAMING,
-      edge_id);
-
   hwangsae_recorder_stop_recording (self->recorder);
 }
 
