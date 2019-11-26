@@ -177,7 +177,7 @@ static gboolean
 hwangsae_relay_agent_edge_interface_handle_change_parameters (
     Hwangsae1DBusEdgeInterface * object, GDBusMethodInvocation * invocation,
     gchar * arg_id, gint arg_width, gint arg_height, gint arg_fps,
-    gpointer user_data)
+    gint arg_bitrate, gpointer user_data)
 {
   ChamgeReturn ret = CHAMGE_RETURN_OK;
   g_autofree gchar *cmd = NULL;
@@ -188,8 +188,8 @@ hwangsae_relay_agent_edge_interface_handle_change_parameters (
   cmd =
       g_strdup_printf
       ("{\"to\":\"%s\",\"method\":\"streamingChangeParameters\", "
-      "\"params\": {\"width\":%d, \"height\":%d, \"fps\": %d}}",
-      arg_id, arg_width, arg_height, arg_fps);
+      "\"params\": {\"width\":%d, \"height\":%d, \"fps\": %d, \"bitrates\": %d}}",
+      arg_id, arg_width, arg_height, arg_fps, arg_bitrate);
 
   g_debug ("%s, cmd %s", __func__, cmd);
 
