@@ -58,6 +58,7 @@
     @width:     image pixel width
     @height:    image pixel height
     @fps:       video framerate
+    @bitrate:  video bitrate in bits per second
 
     Changes parameters of video stream from @id. 
     -->
@@ -66,6 +67,7 @@
       <arg name="width" direction="in" type="i"/>
       <arg name="height" direction="in" type="i"/>
       <arg name="fps" direction="in" type="i"/>
+      <arg name="bitrate" direction="in" type="i"/>
     </method>
 
     <!--
