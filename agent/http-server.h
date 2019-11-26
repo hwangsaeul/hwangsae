@@ -27,7 +27,7 @@ G_BEGIN_DECLS
 #define HWANGSAE_TYPE_HTTP_SERVER   (hwangsae_http_server_get_type())
 G_DECLARE_FINAL_TYPE                (HwangsaeHttpServer, hwangsae_http_server, HWANGSAE, HTTP_SERVER, GObject)
 
-HwangsaeHttpServer     *hwangsae_http_server_new (void);
+HwangsaeHttpServer     *hwangsae_http_server_new (guint16 port);
 
 gchar                  *hwangsae_http_server_get_recording_dir (HwangsaeHttpServer *server);
 
