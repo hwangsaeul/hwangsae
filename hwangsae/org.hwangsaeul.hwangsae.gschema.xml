@@ -26,6 +26,11 @@
       <summary>Recording directory</summary>
       <description>Where Hwangsae recorder stores its files</description>
     </key>
+    <key name="http-port" type="u">
+      <default>8090</default>
+      <summary>HTTP port</summary>
+      <description>Binding port for HTTP server</description>
+    </key>
     <key name="relay-address" type="s">
       <default>"127.0.0.1"</default>
       <summary>IP address of Relay</summary>

@@ -33,6 +33,8 @@ struct _HwangsaeHttpServer
 
   SoupServer *soup_server;
 
+  guint port;
+
   gchar *recording_dir;
 };
 
@@ -40,10 +42,17 @@ struct _HwangsaeHttpServer
 G_DEFINE_TYPE (HwangsaeHttpServer, hwangsae_http_server, G_TYPE_OBJECT)
 /* *INDENT-ON* */
 
-HwangsaeHttpServer *
-hwangsae_http_server_new (void)
+enum
 {
-  return HWANGSAE_HTTP_SERVER (g_object_new (HWANGSAE_TYPE_HTTP_SERVER, NULL));
+  PROP_PORT = 1,
+  PROP_LAST
+};
+
+HwangsaeHttpServer *
+hwangsae_http_server_new (guint16 port)
+{
+  return HWANGSAE_HTTP_SERVER (g_object_new (HWANGSAE_TYPE_HTTP_SERVER,
+          "port", port, NULL));
 }
 
 gchar *
@@ -147,18 +156,38 @@ http_cb (SoupServer * server, SoupMessage * msg, const char *path,
 }
 
 static void
-hwangsae_http_server_init (HwangsaeHttpServer * server)
+hwangsae_http_server_init (HwangsaeHttpServer * self)
 {
+}
+
+static void
+hwangsae_http_server_constructed (GObject * object)
+{
+  HwangsaeHttpServer *self = HWANGSAE_HTTP_SERVER (object);
   GError *error = NULL;
 
-  server->soup_server = soup_server_new (NULL, NULL);
-  server->recording_dir = NULL;
+  self->soup_server = soup_server_new (NULL, NULL);
+  soup_server_add_handler (self->soup_server, NULL, http_cb, self, NULL);
+
+  soup_server_listen_all (self->soup_server, self->port, 0, &error);
   g_assert_no_error (error);
 
-  soup_server_add_handler (server->soup_server, NULL, http_cb, server, NULL);
+  g_debug ("HTTP server listening on port %u", self->port);
+}
 
-  soup_server_listen_all (server->soup_server, 8090, 0, &error);
-  g_assert_no_error (error);
+static void
+hwangsae_http_server_set_property (GObject * object, guint property_id,
+    const GValue * value, GParamSpec * pspec)
+{
+  HwangsaeHttpServer *self = HWANGSAE_HTTP_SERVER (object);
+
+  switch (property_id) {
+    case PROP_PORT:
+      self->port = g_value_get_uint (value);
+      break;
+    default:
+      G_OBJECT_WARN_INVALID_PROPERTY_ID (object, property_id, pspec);
+  }
 }
 
 static void
@@ -176,5 +205,13 @@ hwangsae_http_server_class_init (HwangsaeHttpServerClass * klass)
 {
   GObjectClass *gobject_class = G_OBJECT_CLASS (klass);
 
+  gobject_class->constructed = hwangsae_http_server_constructed;
+  gobject_class->set_property = hwangsae_http_server_set_property;
   gobject_class->dispose = hwangsae_http_server_dispose;
+
+  g_object_class_install_property (gobject_class, PROP_PORT,
+      g_param_spec_uint ("port", "Server listen port", "Server listen port",
+          0, G_MAXUINT16, 8080,
+          G_PARAM_WRITABLE | G_PARAM_CONSTRUCT_ONLY | G_PARAM_STATIC_STRINGS));
+
 }

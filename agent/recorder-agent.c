@@ -530,7 +530,9 @@ hwangsae_recorder_agent_init (HwangsaeRecorderAgent * self)
 
   self->recorder = hwangsae_recorder_new ();
 
-  self->hwangsae_http_server = hwangsae_http_server_new ();
+  self->hwangsae_http_server =
+      hwangsae_http_server_new (g_settings_get_uint (self->settings,
+          "http-port"));
   hwangsae_http_server_set_recording_dir (self->hwangsae_http_server,
       recording_dir);
 
