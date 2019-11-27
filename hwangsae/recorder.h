@@ -52,10 +52,7 @@ void                    hwangsae_recorder_set_max_size_bytes
 guint64                 hwangsae_recorder_get_max_size_bytes
                                                        (HwangsaeRecorder * self);
 
-gint64                  hwangsae_recorder_get_recording_id
-                                                       (HwangsaeRecorder * self);
-
-gint64                  hwangsae_recorder_start_recording
+void                    hwangsae_recorder_start_recording
                                                        (HwangsaeRecorder * self,
                                                         const gchar * uri);
 

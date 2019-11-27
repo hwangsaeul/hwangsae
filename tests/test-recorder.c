@@ -388,7 +388,6 @@ split_file_created_cb (HwangsaeRecorder * recorder,
 {
   g_debug ("Created file %s", file_path);
 
-  data->filenames = g_slist_append (data->filenames, g_strdup (file_path));
   if (++data->file_created_signal_count == NUM_FILE_SEGMENTS) {
     hwangsae_recorder_stop_recording (recorder);
   }
@@ -400,6 +399,7 @@ split_file_completed_cb (HwangsaeRecorder * recorder,
 {
   g_debug ("Completed file %s", file_path);
 
+  data->filenames = g_slist_append (data->filenames, g_strdup (file_path));
   ++data->file_completed_signal_count;
 }
 

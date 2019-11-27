@@ -47,18 +47,11 @@ stream_connected_cb (HwangsaeRecorder * recorder, gpointer unused)
   g_print ("Stream connected\n");
 }
 
-
-static void
-file_created_cb (HwangsaeRecorder * recorder, const gchar * file_path,
-    gpointer unused)
-{
-  g_print ("Recording to file %s\n", file_path);
-}
-
 static void
 file_completed_cb (HwangsaeRecorder * recorder, const gchar * file_path,
     GApplication * app)
 {
+  g_print ("Created recording  %s\n", file_path);
   g_application_release (app);
 }
 
@@ -117,8 +110,6 @@ main (int argc, char *argv[])
   recorder = hwangsae_recorder_new ();
   g_signal_connect (recorder, "stream-connected",
       (GCallback) stream_connected_cb, NULL);
-  g_signal_connect (recorder, "file-created",
-      (GCallback) file_created_cb, NULL);
   g_signal_connect (recorder, "file-completed",
       (GCallback) file_completed_cb, app);
 
