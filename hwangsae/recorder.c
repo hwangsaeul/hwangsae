@@ -276,11 +276,24 @@ hwangsae_recorder_stop_recording (HwangsaeRecorder * self)
 
   g_autoptr (GstElement) srcbin = NULL;
 
+  g_autoptr (GstElement) splitmuxsink = NULL;
+
+  GstState state;
+
   g_return_if_fail (priv->pipeline);
 
   srcbin = gst_bin_get_by_name (GST_BIN (priv->pipeline), "srcbin");
 
   gst_element_send_event (srcbin, gst_event_new_eos ());
+
+  splitmuxsink = gst_bin_get_by_name (GST_BIN (priv->pipeline), "sink");
+
+  gst_element_get_state (splitmuxsink, &state, NULL, 1E9);
+
+  if (state != GST_STATE_PLAYING) {
+    g_warning ("splitmuxsink in state %d, forcing internal stop", state);
+    hwangsae_recorder_stop_recording_internal (self);
+  }
 }
 
 static void
