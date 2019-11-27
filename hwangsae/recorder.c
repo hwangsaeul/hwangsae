@@ -20,6 +20,7 @@
 
 #include "enumtypes.h"
 
+#include <glib/gstdio.h>
 #include <gio/gio.h>
 #include <gst/gst.h>
 
@@ -40,10 +41,10 @@ typedef struct
   GstElement *pipeline;
 
   gchar *recording_dir;
-  gint64 record_id;
   HwangsaeContainer container;
   guint64 max_size_time;
   guint64 max_size_bytes;
+  GQueue fragment_start_times;
 } HwangsaeRecorderPrivate;
 
 /* *INDENT-OFF* */
@@ -131,13 +132,60 @@ hwangsae_recorder_stop_recording_internal (HwangsaeRecorder * self)
 {
   HwangsaeRecorderPrivate *priv = hwangsae_recorder_get_instance_private (self);
 
-  priv->record_id = -ENOENT;
   gst_element_set_state (priv->pipeline, GST_STATE_NULL);
   g_clear_pointer (&priv->pipeline, gst_object_unref);
+  g_queue_foreach (&priv->fragment_start_times, (GFunc) g_free, NULL);
+  g_queue_clear (&priv->fragment_start_times);
 
   g_signal_emit (self, signals[STREAM_DISCONNECTED_SIGNAL], 0);
 
   g_debug ("Recording stopped");
+}
+
+static void
+hwangsae_recorder_on_file_opened (HwangsaeRecorder * recorder,
+    GstClockTime running_time)
+{
+  HwangsaeRecorderPrivate *priv =
+      hwangsae_recorder_get_instance_private (recorder);
+
+  GstClockTime *start_time = g_new (GstClockTime, 1);
+
+  *start_time = running_time;
+
+  g_queue_push_head (&priv->fragment_start_times, start_time);
+
+  g_signal_emit (recorder, signals[FILE_CREATED_SIGNAL], 0);
+}
+
+static void
+hwangsae_recorder_on_file_completed (HwangsaeRecorder * recorder,
+    const gchar * file, GstClockTime running_time)
+{
+  HwangsaeRecorderPrivate *priv =
+      hwangsae_recorder_get_instance_private (recorder);
+  g_autofree GstClockTime *start_time = NULL;
+  GstClockTime base_time;
+  g_autofree gchar *target_file = NULL;
+  GEnumValue *container;
+
+  start_time = g_queue_pop_tail (&priv->fragment_start_times);
+  g_assert_nonnull (start_time);
+
+  base_time = gst_element_get_base_time (priv->pipeline);
+
+  container = g_enum_get_value
+      (g_type_class_peek (HWANGSAE_TYPE_CONTAINER), priv->container);
+
+  target_file = g_build_filename (priv->recording_dir,
+      "hwangsae-recording-%ld-%ld.%s", NULL);
+  target_file = g_strdup_printf (target_file,
+      (base_time + *start_time) / GST_USECOND,
+      (base_time + running_time) / GST_USECOND, container->value_nick);
+
+  g_rename (file, target_file);
+
+  g_signal_emit (recorder, signals[FILE_COMPLETED_SIGNAL], 0, target_file);
 }
 
 static gboolean
@@ -159,11 +207,16 @@ gst_bus_cb (GstBus * bus, GstMessage * message, gpointer data)
       const GstStructure *s = gst_message_get_structure (message);
 
       if (gst_structure_has_name (s, "splitmuxsink-fragment-opened")) {
-        g_signal_emit (recorder, signals[FILE_CREATED_SIGNAL], 0,
-            gst_structure_get_string (s, "location"));
+        GstClockTime running_time;
+
+        gst_structure_get_clock_time (s, "running-time", &running_time);
+        hwangsae_recorder_on_file_opened (recorder, running_time);
       } else if (gst_structure_has_name (s, "splitmuxsink-fragment-closed")) {
-        g_signal_emit (recorder, signals[FILE_COMPLETED_SIGNAL], 0,
-            gst_structure_get_string (s, "location"));
+        GstClockTime running_time;
+
+        gst_structure_get_clock_time (s, "running-time", &running_time);
+        hwangsae_recorder_on_file_completed (recorder,
+            gst_structure_get_string (s, "location"), running_time);
       }
       break;
     }
@@ -190,22 +243,11 @@ first_buffer_cb (GstPad * pad, GstPadProbeInfo * info, gpointer data)
   return GST_PAD_PROBE_REMOVE;
 }
 
-
-gint64
-hwangsae_recorder_get_recording_id (HwangsaeRecorder * self)
-{
-  HwangsaeRecorderPrivate *priv = hwangsae_recorder_get_instance_private (self);
-
-  return priv->record_id;
-}
-
-gint64
+void
 hwangsae_recorder_start_recording (HwangsaeRecorder * self, const gchar * uri)
 {
   HwangsaeRecorderPrivate *priv = hwangsae_recorder_get_instance_private (self);
 
-  g_autoptr (GEnumClass) enum_class = NULL;
-  GEnumValue *container;
   g_autoptr (GstBus) bus = NULL;
   g_autoptr (GstElement) element = NULL;
   g_autoptr (GstPad) parse_src = NULL;
@@ -214,21 +256,13 @@ hwangsae_recorder_start_recording (HwangsaeRecorder * self, const gchar * uri)
   const gchar *mux_name;
   g_autoptr (GError) error = NULL;
 
-  g_return_val_if_fail (!priv->pipeline, ENOENT);
+  g_return_if_fail (!priv->pipeline);
 
   g_mkdir_with_parents (priv->recording_dir, 0750);
 
-  enum_class = g_type_class_ref (HWANGSAE_TYPE_CONTAINER);
-  container = g_enum_get_value (enum_class, priv->container);
-
-  priv->record_id = g_get_real_time ();
-
-  g_debug ("record_id %ld", priv->record_id);
-
   recording_file = g_build_filename (priv->recording_dir,
-      "hwangsae-recording-%ld-%%05d.%s", NULL);
-  recording_file = g_strdup_printf (recording_file, priv->record_id,
-      container->value_nick);
+      "hwangsae-recording-%ld-%%05d.tmp", NULL);
+  recording_file = g_strdup_printf (recording_file, g_get_real_time ());
 
   switch (priv->container) {
     case HWANGSAE_CONTAINER_MP4:
@@ -238,7 +272,8 @@ hwangsae_recorder_start_recording (HwangsaeRecorder * self, const gchar * uri)
       mux_name = "mpegtsmux";
       break;
     default:
-      g_error ("Unknown container format %s", container->value_nick);
+      g_error ("Unknown container format %s",
+          g_enum_to_string (HWANGSAE_TYPE_CONTAINER, priv->container));
   }
 
   pipeline_str =
@@ -265,8 +300,6 @@ hwangsae_recorder_start_recording (HwangsaeRecorder * self, const gchar * uri)
       "max-size-bytes", priv->max_size_bytes, NULL);
 
   gst_element_set_state (priv->pipeline, GST_STATE_PLAYING);
-
-  return priv->record_id;
 }
 
 void
@@ -373,11 +406,19 @@ hwangsae_recorder_class_init (HwangsaeRecorderClass * klass)
 
   signals[FILE_CREATED_SIGNAL] =
       g_signal_new ("file-created", G_TYPE_FROM_CLASS (klass),
-      G_SIGNAL_RUN_LAST, 0, NULL, NULL, NULL, G_TYPE_NONE, 1, G_TYPE_STRING);
+      G_SIGNAL_RUN_LAST, 0, NULL, NULL, NULL, G_TYPE_NONE, 0);
 
   signals[FILE_COMPLETED_SIGNAL] =
       g_signal_new ("file-completed", G_TYPE_FROM_CLASS (klass),
       G_SIGNAL_RUN_LAST, 0, NULL, NULL, NULL, G_TYPE_NONE, 1, G_TYPE_STRING);
+
+  {
+    /* Make sure GStreamer system clock operate in real time, so that we're able
+     * to convert running times to unix timestamps using the pipeline's base
+     * time. */
+    g_autoptr (GstClock) clock = gst_system_clock_obtain ();
+    g_object_set (clock, "clock-type", GST_CLOCK_TYPE_REALTIME, NULL);
+  }
 }
 
 static void
@@ -387,8 +428,6 @@ hwangsae_recorder_init (HwangsaeRecorder * self)
   g_autofree gchar *dir = NULL;
 
   priv->settings = g_settings_new ("org.hwangsaeul.hwangsae.recorder");
-
-  priv->record_id = -ENOENT;
 
   dir = g_build_filename (g_get_user_data_dir (),
       "hwangsaeul", "hwangsae", "recordings", NULL);

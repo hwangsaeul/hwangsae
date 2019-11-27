@@ -46,6 +46,7 @@ struct _HwangsaeRecorderAgent
   HwangsaeHttpServer *hwangsae_http_server;
 
   gboolean is_recording;
+  gint64 recording_id;
 };
 
 /* *INDENT-OFF* */
@@ -120,10 +121,11 @@ hwangsae_recorder_agent_start_recording (HwangsaeRecorderAgent * self,
 
   if (self->is_recording) {
     g_warning ("recording already started");
-    return hwangsae_recorder_get_recording_id (self->recorder);
+    return self->recording_id;
   }
 
   self->is_recording = TRUE;
+  self->recording_id = g_get_real_time ();
 
   hwangsae_recorder_agent_send_rest_api (self, RELAY_METHOD_START_STREAMING,
       edge_id);
@@ -148,7 +150,9 @@ hwangsae_recorder_agent_start_recording (HwangsaeRecorderAgent * self,
 
   g_object_set (self->recorder, "recording-dir", recording_edge_dir, NULL);
 
-  return hwangsae_recorder_start_recording (self->recorder, url);
+  hwangsae_recorder_start_recording (self->recorder, url);
+
+  return self->recording_id;
 }
 
 static void
