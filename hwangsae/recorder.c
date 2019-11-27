@@ -41,6 +41,7 @@ typedef struct
   GstElement *pipeline;
 
   gchar *recording_dir;
+  gchar *filename_prefix;
   HwangsaeContainer container;
   guint64 max_size_time;
   guint64 max_size_bytes;
@@ -57,6 +58,7 @@ enum
   PROP_CONTAINER,
   PROP_MAX_SIZE_TIME,
   PROP_MAX_SIZE_BYTES,
+  PROP_FILENAME_PREFIX,
   PROP_LAST
 };
 
@@ -177,9 +179,9 @@ hwangsae_recorder_on_file_completed (HwangsaeRecorder * recorder,
   container = g_enum_get_value
       (g_type_class_peek (HWANGSAE_TYPE_CONTAINER), priv->container);
 
-  target_file = g_build_filename (priv->recording_dir,
-      "hwangsae-recording-%ld-%ld.%s", NULL);
+  target_file = g_build_filename (priv->recording_dir, "%s-%ld-%ld.%s", NULL);
   target_file = g_strdup_printf (target_file,
+      priv->filename_prefix,
       (base_time + *start_time) / GST_USECOND,
       (base_time + running_time) / GST_USECOND, container->value_nick);
 
@@ -261,8 +263,9 @@ hwangsae_recorder_start_recording (HwangsaeRecorder * self, const gchar * uri)
   g_mkdir_with_parents (priv->recording_dir, 0750);
 
   recording_file = g_build_filename (priv->recording_dir,
-      "hwangsae-recording-%ld-%%05d.tmp", NULL);
-  recording_file = g_strdup_printf (recording_file, g_get_real_time ());
+      "%s-%ld-%%05d.tmp", NULL);
+  recording_file = g_strdup_printf (recording_file, priv->filename_prefix,
+      g_get_real_time ());
 
   switch (priv->container) {
     case HWANGSAE_CONTAINER_MP4:
@@ -337,6 +340,10 @@ hwangsae_recorder_set_property (GObject * object, guint property_id,
     case PROP_MAX_SIZE_BYTES:
       priv->max_size_bytes = g_value_get_uint64 (value);
       break;
+    case PROP_FILENAME_PREFIX:
+      g_clear_pointer (&priv->filename_prefix, g_free);
+      priv->filename_prefix = g_strdup (g_value_get_string (value));
+      break;
     default:
       G_OBJECT_WARN_INVALID_PROPERTY_ID (object, property_id, pspec);
   }
@@ -361,6 +368,9 @@ hwangsae_recorder_get_property (GObject * object, guint property_id,
       break;
     case PROP_MAX_SIZE_BYTES:
       g_value_set_uint64 (value, priv->max_size_bytes);
+      break;
+    case PROP_FILENAME_PREFIX:
+      g_value_set_string (value, priv->filename_prefix);
       break;
     default:
       G_OBJECT_WARN_INVALID_PROPERTY_ID (object, property_id, pspec);
@@ -395,6 +405,11 @@ hwangsae_recorder_class_init (HwangsaeRecorderClass * klass)
       g_param_spec_uint64 ("max-size-bytes", "Max recording file size in bytes",
           "Max amount of bytes per recording file (0 = disable)",
           0, G_MAXUINT64, 0, G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS));
+
+  g_object_class_install_property (gobject_class, PROP_FILENAME_PREFIX,
+      g_param_spec_string ("filename-prefix", "Recording file prefix",
+          "Recording file prefix", "hwangsae-recording",
+          G_PARAM_READWRITE | G_PARAM_CONSTRUCT | G_PARAM_STATIC_STRINGS));
 
   signals[STREAM_CONNECTED_SIGNAL] =
       g_signal_new ("stream-connected", G_TYPE_FROM_CLASS (klass),
