@@ -118,6 +118,7 @@ hwangsae_recorder_agent_start_recording (HwangsaeRecorderAgent * self,
   g_autofree gchar *streamid = NULL;
   g_autofree gchar *url = NULL;
   g_autofree gchar *recording_edge_dir = NULL;
+  g_autofree gchar *filename_prefix = NULL;
 
   if (self->is_recording) {
     g_warning ("recording already started");
@@ -148,7 +149,11 @@ hwangsae_recorder_agent_start_recording (HwangsaeRecorderAgent * self,
 
   g_debug ("setting recording_dir: %s\n", recording_edge_dir);
 
-  g_object_set (self->recorder, "recording-dir", recording_edge_dir, NULL);
+  filename_prefix = g_strdup_printf ("hwangsae-recording-%ld",
+      self->recording_id);
+
+  g_object_set (self->recorder, "recording-dir", recording_edge_dir,
+      "filename-prefix", filename_prefix, NULL);
 
   hwangsae_recorder_start_recording (self->recorder, url);
 
