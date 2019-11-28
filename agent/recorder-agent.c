@@ -349,6 +349,13 @@ get_records (gchar * recording_dir, gchar * arg_edge_id, gchar * arg_record_id,
   gchar *edge_id = NULL;
   gboolean records_found = FALSE;
 
+  if ((!arg_edge_id || !g_strcmp0 (arg_edge_id, "")) &&
+      (!arg_record_id || !g_strcmp0 (arg_record_id, ""))) {
+    edge_id = g_strdup ("");
+
+    return edge_id;
+  }
+
   dir = g_dir_open (recording_dir, 0, &error);
   if (error) {
     g_dir_close (dir);
