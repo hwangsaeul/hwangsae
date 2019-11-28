@@ -66,7 +66,7 @@ hwangsae_http_server_set_recording_dir (HwangsaeHttpServer * server,
     gchar * recording_dir)
 {
   g_free (server->recording_dir);
-  server->recording_dir = strdup (recording_dir);
+  server->recording_dir = g_strdup (recording_dir);
 }
 
 static gchar *
