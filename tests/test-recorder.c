@@ -485,6 +485,29 @@ test_recorder_split_bytes (TestFixture * fixture, gconstpointer unused)
   }
 }
 
+static gboolean
+stop_recording_no_streamer_cb (HwangsaeRecorder * recorder)
+{
+  /* Stop the recorder before anything has connected. */
+  hwangsae_recorder_stop_recording (recorder);
+
+  return G_SOURCE_REMOVE;
+}
+
+static void
+test_recorder_stop_no_streamer (TestFixture * fixture, gconstpointer unused)
+{
+  g_signal_connect (fixture->recorder, "stream-disconnected",
+      (GCallback) stream_disconnected_cb, fixture);
+
+  hwangsae_recorder_start_recording (fixture->recorder, "srt://127.0.0.1:2222");
+
+  g_timeout_add_seconds (1, (GSourceFunc) stop_recording_no_streamer_cb,
+      fixture->recorder);
+
+  g_main_loop_run (fixture->loop);
+}
+
 int
 main (int argc, char *argv[])
 {
@@ -511,6 +534,10 @@ main (int argc, char *argv[])
   g_test_add ("/hwangsae/recorder-split-bytes",
       TestFixture, NULL, fixture_setup,
       test_recorder_split_bytes, fixture_teardown);
+
+  g_test_add ("/hwangsae/recorder-stop-no-streamer",
+      TestFixture, NULL, fixture_setup,
+      test_recorder_stop_no_streamer, fixture_teardown);
 
   return g_test_run ();
 }

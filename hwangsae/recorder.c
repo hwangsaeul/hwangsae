@@ -45,6 +45,7 @@ typedef struct
   HwangsaeContainer container;
   guint64 max_size_time;
   guint64 max_size_bytes;
+  gboolean is_connected;
   GQueue fragment_start_times;
 } HwangsaeRecorderPrivate;
 
@@ -140,8 +141,19 @@ hwangsae_recorder_stop_recording_internal (HwangsaeRecorder * self)
   g_queue_clear (&priv->fragment_start_times);
 
   g_signal_emit (self, signals[STREAM_DISCONNECTED_SIGNAL], 0);
+  priv->is_connected = FALSE;
 
   g_debug ("Recording stopped");
+}
+
+static void
+hwangsae_recorder_on_first_frame (HwangsaeRecorder * recorder)
+{
+  HwangsaeRecorderPrivate *priv =
+      hwangsae_recorder_get_instance_private (recorder);
+
+  priv->is_connected = TRUE;
+  g_signal_emit (recorder, signals[STREAM_CONNECTED_SIGNAL], 0);
 }
 
 static void
@@ -201,7 +213,7 @@ gst_bus_cb (GstBus * bus, GstMessage * message, gpointer data)
           gst_structure_get_name (gst_message_get_structure (message));
 
       if (g_str_equal (name, "hwangsae-recorder-first-frame")) {
-        g_signal_emit (recorder, signals[STREAM_CONNECTED_SIGNAL], 0);
+        hwangsae_recorder_on_first_frame (recorder);
       }
       break;
     }
@@ -310,13 +322,18 @@ hwangsae_recorder_stop_recording (HwangsaeRecorder * self)
 {
   HwangsaeRecorderPrivate *priv = hwangsae_recorder_get_instance_private (self);
 
-  g_autoptr (GstElement) srcbin = NULL;
-
   g_return_if_fail (priv->pipeline);
 
-  srcbin = gst_bin_get_by_name (GST_BIN (priv->pipeline), "srcbin");
+  if (priv->is_connected) {
+    g_autoptr (GstElement) srcbin = NULL;
 
-  gst_element_send_event (srcbin, gst_event_new_eos ());
+    srcbin = gst_bin_get_by_name (GST_BIN (priv->pipeline), "srcbin");
+    gst_element_send_event (srcbin, gst_event_new_eos ());
+  } else {
+    /* Stopping pipeline before it has processed any frames. We can tear it down
+     * right away. */
+    hwangsae_recorder_stop_recording_internal (self);
+  }
 }
 
 static void
