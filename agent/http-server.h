@@ -34,6 +34,14 @@ gchar                  *hwangsae_http_server_get_recording_dir (HwangsaeHttpServ
 void                    hwangsae_http_server_set_recording_dir (HwangsaeHttpServer *server,
                                                                 gchar              *recording_dir);
 
+gchar                  *hwangsae_http_server_get_url           (HwangsaeHttpServer *server,
+                                                                gchar              *edge_id,
+                                                                gchar              *file_id);
+
+gchar                  *hwangsae_http_server_check_file_path   (HwangsaeHttpServer *server,
+                                                                gchar              *edge_id,
+                                                                gchar              *file_id);
+
 G_END_DECLS
 
 #endif /* __HWANGSAE_HTTP_SERVER_H__ */

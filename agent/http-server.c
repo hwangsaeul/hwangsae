@@ -23,6 +23,7 @@
 
 #include <json-glib/json-glib.h>
 
+#include <hwangsae/common.h>
 #include <libsoup/soup-message.h>
 #include <libsoup/soup-server.h>
 #include <errno.h>
@@ -82,8 +83,9 @@ get_file_path (gchar * base_path, gchar * file_id, gchar * ext)
   return file_path;
 }
 
-static gchar *
-check_file_path (HwangsaeHttpServer * server, gchar * edge_id, gchar * file_id)
+gchar *
+hwangsae_http_server_check_file_path (HwangsaeHttpServer * server,
+    gchar * edge_id, gchar * file_id)
 {
   g_autofree gchar *recording_edge_dir;
   gchar *file_path;
@@ -102,6 +104,25 @@ check_file_path (HwangsaeHttpServer * server, gchar * edge_id, gchar * file_id)
   g_free (file_path);
 
   return NULL;
+}
+
+gchar *
+hwangsae_http_server_get_url (HwangsaeHttpServer * server, gchar * edge_id,
+    gchar * file_id)
+{
+  g_autofree gchar *file_path = NULL;
+  g_autofree gchar *local_ip = NULL;
+
+  file_path = hwangsae_http_server_check_file_path (server, edge_id, file_id);
+
+  if (!file_path) {
+    return g_strdup ("");
+  }
+
+  local_ip = hwangsae_common_get_local_ip ();
+
+  return g_strdup_printf ("http://%s:%d/%s/%s", local_ip, 8090, edge_id,
+      file_id);
 }
 
 static void
@@ -131,8 +152,6 @@ http_cb (SoupServer * server, SoupMessage * msg, const char *path,
 
   parts_len = g_strv_length (parts);
 
-  g_debug ("request parts_len: %d", parts_len);
-
   if (parts_len != 3) {
     g_strfreev (parts);
     soup_message_set_status (msg, SOUP_STATUS_NOT_FOUND);
@@ -144,13 +163,13 @@ http_cb (SoupServer * server, SoupMessage * msg, const char *path,
 
   g_strfreev (parts);
 
-  file_path = check_file_path (self, edge_id, file_id);
+  file_path = hwangsae_http_server_check_file_path (self, edge_id, file_id);
   if (!file_path) {
     soup_message_set_status (msg, SOUP_STATUS_NOT_FOUND);
     return;
   }
 
-  g_debug ("file_id: %s file: %s", file_id, file_path);
+  g_debug ("file path: %s", file_path);
 
   if (g_stat (file_path, &st) == -1) {
     g_debug ("file %s cannot be accessed", file_path);

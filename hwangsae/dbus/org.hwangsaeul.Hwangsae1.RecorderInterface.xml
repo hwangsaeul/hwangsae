@@ -51,5 +51,29 @@
       <arg name="records" direction="out" type="a(ssxxx)"/>
     </method>
 
+    <!--
+    Url:
+    @edgeId:          an unique id of edge
+    @fileId:          an unique id of file
+
+    Get the URL of a file
+    -->
+    <method name="Url">
+      <arg name="edgeId" direction="in" type="s"/>
+      <arg name="fileId" direction="in" type="s"/>
+      <arg name="url" direction="out" type="s"/>
+    </method>
+
+    <!--
+    Delete:
+    @edgeId:          an unique id of edge
+    @fileId:          an unique id of file
+
+    Delete a file
+    -->
+    <method name="Delete">
+      <arg name="edgeId" direction="in" type="s"/>
+      <arg name="fileId" direction="in" type="s"/>
+    </method>
   </interface>
 </node>
