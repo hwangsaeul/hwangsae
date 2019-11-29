@@ -14,6 +14,7 @@ source_h = [
 source_c = [
   'recorder.c',
   'relay.c',
+  'common.c'
 ]
 
 gsettings_schemas = [
