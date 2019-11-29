@@ -452,16 +452,30 @@ _relay_main (gpointer data)
 
               while (it) {
                 SRTSOCKET source_socket = GPOINTER_TO_INT (it->data);
+                gint sent = 0;
+                gssize len = 0;
+                gint rest = MIN (recv - len, 1316);
 
                 it = it->next;
+                while (len < recv) {
+                  if ((sent =
+                          srt_send (source_socket, (char *) (buf + len),
+                              rest)) < 0) {
+                    gint error = srt_getlasterror (NULL);
+                    if (error == SRT_ECONNLOST) {
+                      _sink_connection_remove_source (sink, source_socket);
+                    } else {
+                      g_debug ("srt_send failed %s", srt_strerror (error, 0));
+                    }
 
-                if (srt_send (source_socket, buf, recv) < 0) {
-                  gint error = srt_getlasterror (NULL);
-                  if (error == SRT_ECONNLOST) {
-                    _sink_connection_remove_source (sink, source_socket);
+                    break;
+
                   } else {
-                    g_debug ("srt_send failed %s", srt_strerror (error, 0));
+                    g_debug
+                        ("sent buffer %d (size: %ld/%lu) - source sock [0x%x]",
+                        sent, len, recv, source_socket);
                   }
+                  len += sent;
                 }
               }
             } else if (recv < 0) {
