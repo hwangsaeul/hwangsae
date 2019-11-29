@@ -127,10 +127,9 @@ stream_connected_cb (HwangsaeRecorder * recorder, TestFixture * fixture)
 }
 
 static void
-file_created_cb (HwangsaeRecorder * recorder, const gchar * file_path,
-    RecorderTestData * data)
+file_created_cb (HwangsaeRecorder * recorder, RecorderTestData * data)
 {
-  g_debug ("File %s created", file_path);
+  g_debug ("A recording file has been opened");
 
   g_assert_false (data->got_file_created_signal);
   data->got_file_created_signal = TRUE;
@@ -383,10 +382,9 @@ typedef struct
 } SplitData;
 
 static void
-split_file_created_cb (HwangsaeRecorder * recorder,
-    const gchar * file_path, SplitData * data)
+split_file_created_cb (HwangsaeRecorder * recorder, SplitData * data)
 {
-  g_debug ("Created file %s", file_path);
+  g_debug ("A recording file has been opened");
 
   if (++data->file_created_signal_count == NUM_FILE_SEGMENTS) {
     hwangsae_recorder_stop_recording (recorder);
