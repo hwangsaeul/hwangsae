@@ -503,6 +503,56 @@ gboolean
   return TRUE;
 }
 
+gboolean
+hwangsae_recorder_agent_recorder_interface_handle_url
+    (Hwangsae1DBusRecorderInterface * object,
+    GDBusMethodInvocation * invocation, gchar * arg_edge_id,
+    gchar * arg_file_id, gpointer user_data) {
+  HwangsaeRecorderAgent *self = (HwangsaeRecorderAgent *) user_data;
+  g_autofree gchar *cmd = NULL;
+  g_autofree gchar *response = NULL;
+  gchar *url = NULL;
+
+  g_debug ("hwangsae_recorder_agent_recorder_interface_handle_url");
+
+  url = hwangsae_http_server_get_url (self->hwangsae_http_server, arg_edge_id,
+      arg_file_id);
+
+  g_debug ("url: %s", url);
+
+  hwangsae1_dbus_recorder_interface_complete_url (object, invocation, url);
+
+  return TRUE;
+}
+
+gboolean
+hwangsae_recorder_agent_recorder_interface_handle_delete
+    (Hwangsae1DBusRecorderInterface * object,
+    GDBusMethodInvocation * invocation, gchar * arg_edge_id,
+    gchar * arg_file_id, gpointer user_data) {
+  HwangsaeRecorderAgent *self = (HwangsaeRecorderAgent *) user_data;
+  g_autofree gchar *cmd = NULL;
+  g_autofree gchar *response = NULL;
+  g_autofree gchar *filename = NULL;
+
+  g_debug ("hwangsae_recorder_agent_recorder_interface_handle_delete");
+
+  filename =
+      hwangsae_http_server_check_file_path (self->hwangsae_http_server,
+      arg_edge_id, arg_file_id);
+
+  if (filename) {
+    g_debug ("deleting file %s", filename);
+    g_remove (filename);
+  } else {
+    g_debug ("unable to delete file id %s, not found", arg_file_id);
+  }
+
+  hwangsae1_dbus_recorder_interface_complete_delete (object, invocation);
+
+  return TRUE;
+}
+
 static void
 hwangsae_recorder_agent_dispose (GObject * object)
 {
@@ -578,6 +628,13 @@ hwangsae_recorder_agent_init (HwangsaeRecorderAgent * self)
   g_signal_connect (self->recorder_interface, "handle-lookup-by-edge",
       G_CALLBACK
       (hwangsae_recorder_agent_recorder_interface_handle_lookup_by_edge), self);
+
+  g_signal_connect (self->recorder_interface, "handle-url",
+      G_CALLBACK (hwangsae_recorder_agent_recorder_interface_handle_url), self);
+
+  g_signal_connect (self->recorder_interface, "handle-delete",
+      G_CALLBACK
+      (hwangsae_recorder_agent_recorder_interface_handle_delete), self);
 
   hwangsae_recorder_set_container (self->recorder, HWANGSAE_CONTAINER_TS);
 }
