@@ -304,7 +304,7 @@ parse_filename (const gchar * fn, gchar ** record_id, gint64 * file_start,
   *file_end = 0;
 
   parts = g_strsplit (fn, ".", -1);
-  if (!(parts[0] && parts[1]))
+  if (!(parts && parts[0] && parts[1]))
     goto cleanup;
 
   tmp = g_strdup (parts[0]);
