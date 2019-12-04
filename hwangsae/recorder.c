@@ -265,6 +265,7 @@ hwangsae_recorder_start_recording (HwangsaeRecorder * self, const gchar * uri)
   g_autoptr (GstBus) bus = NULL;
   g_autoptr (GstElement) element = NULL;
   g_autoptr (GstPad) parse_src = NULL;
+  g_autofree gchar *recording_file_tmp = NULL;
   g_autofree gchar *recording_file = NULL;
   g_autofree gchar *pipeline_str = NULL;
   const gchar *mux_name;
@@ -274,9 +275,9 @@ hwangsae_recorder_start_recording (HwangsaeRecorder * self, const gchar * uri)
 
   g_mkdir_with_parents (priv->recording_dir, 0750);
 
-  recording_file = g_build_filename (priv->recording_dir,
+  recording_file_tmp = g_build_filename (priv->recording_dir,
       "%s-%ld-%%05d.tmp", NULL);
-  recording_file = g_strdup_printf (recording_file, priv->filename_prefix,
+  recording_file = g_strdup_printf (recording_file_tmp, priv->filename_prefix,
       g_get_real_time ());
 
   switch (priv->container) {

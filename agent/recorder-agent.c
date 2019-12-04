@@ -128,6 +128,7 @@ hwangsae_recorder_agent_start_recording (HwangsaeRecorderAgent * self,
   g_autoptr (GError) error = NULL;
   g_autofree gchar *host = g_strdup (self->relay_address);
   guint port = self->relay_stream_port;
+  g_autofree gchar *streamid_tmp = NULL;
   g_autofree gchar *streamid = NULL;
   g_autofree gchar *url = NULL;
   g_autofree gchar *recording_edge_dir = NULL;
@@ -144,8 +145,8 @@ hwangsae_recorder_agent_start_recording (HwangsaeRecorderAgent * self,
   hwangsae_recorder_agent_send_rest_api (self, RELAY_METHOD_START_STREAMING,
       edge_id);
 
-  streamid = g_strdup_printf ("#!::r=%s", edge_id);
-  streamid = g_uri_escape_string (streamid, NULL, FALSE);
+  streamid_tmp = g_strdup_printf ("#!::r=%s", edge_id);
+  streamid = g_uri_escape_string (streamid_tmp, NULL, FALSE);
   url = g_strdup_printf ("srt://%s:%d?streamid=%s", host, port, streamid);
 
   g_debug ("starting to recording stream from %s", url);
@@ -253,7 +254,7 @@ gboolean
     GDBusMethodInvocation * invocation, gchar * arg_id, gpointer user_data) {
   g_autofree gchar *cmd = NULL;
   g_autofree gchar *response = NULL;
-  gchar *record_id = NULL;
+  g_autofree gchar *record_id = NULL;
   gint64 rec_id;
 
   HwangsaeRecorderAgent *self = (HwangsaeRecorderAgent *) user_data;
@@ -521,7 +522,7 @@ hwangsae_recorder_agent_recorder_interface_handle_url
   HwangsaeRecorderAgent *self = (HwangsaeRecorderAgent *) user_data;
   g_autofree gchar *cmd = NULL;
   g_autofree gchar *response = NULL;
-  gchar *url = NULL;
+  g_autofree gchar *url = NULL;
 
   g_debug ("hwangsae_recorder_agent_recorder_interface_handle_url");
 
