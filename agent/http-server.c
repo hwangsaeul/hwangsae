@@ -113,7 +113,7 @@ hwangsae_http_server_get_url (HwangsaeHttpServer * server, gchar * edge_id,
   else
     local_ip = hwangsae_common_get_local_ip ();
 
-  return g_strdup_printf ("http://%s:%d/%s/%s", local_ip, 8090, edge_id,
+  return g_strdup_printf ("http://%s:%d/%s/%s", local_ip, server->port, edge_id,
       file_id);
 }
 
