@@ -434,11 +434,12 @@ get_records (gchar * recording_dir, gchar * arg_edge_id, gchar * arg_record_id,
           edge_id = g_strdup (edge_id_tmp);
 
         if (!arg_edge_id)
-          g_variant_builder_add (builder, "(sxxx)", g_strdup (file_id),
+          g_variant_builder_add (builder, "(sxxx)", file_id,
               file_start, file_end, st.st_size);
-        else if (!arg_record_id)
-          g_variant_builder_add (builder, "(ssxxx)", g_strdup (record_id),
-              g_strdup (file_id), file_start, file_end, st.st_size);
+        else if (!arg_record_id) {
+          g_variant_builder_add (builder, "(ssxxx)", record_id,
+              file_id, file_start, file_end, st.st_size);
+        }
       }
     }
   }
@@ -459,8 +460,8 @@ gboolean
   g_autofree gchar *response = NULL;
   g_autofree gchar *recording_dir = NULL;
   g_autofree gchar *edge_id = NULL;
-  GVariantBuilder *builder;
-  GVariant *records;
+  g_autoptr (GVariantBuilder) builder = NULL;
+  GVariant *records = NULL;
 
   g_debug
       ("hwangsae_recorder_agent_recorder_interface_handle_lookup_by_record");
@@ -472,9 +473,7 @@ gboolean
   edge_id = get_records (recording_dir, NULL, arg_record_id, arg_from, arg_to,
       builder);
 
-  records = g_variant_new ("a(sxxx)", builder);
-
-  g_variant_builder_unref (builder);
+  records = g_variant_builder_end (builder);
 
   hwangsae1_dbus_recorder_interface_complete_lookup_by_record (object,
       invocation, edge_id, records);
@@ -492,8 +491,8 @@ gboolean
   g_autofree gchar *response = NULL;
   g_autofree gchar *recording_dir = NULL;
   g_autofree gchar *edge_id = NULL;
-  GVariantBuilder *builder;
-  GVariant *records;
+  g_autoptr (GVariantBuilder) builder = NULL;
+  GVariant *records = NULL;
 
   g_debug ("hwangsae_recorder_agent_recorder_interface_handle_lookup_by_edge");
 
@@ -504,9 +503,7 @@ gboolean
   edge_id = get_records (recording_dir, arg_edge_id, NULL, arg_from, arg_to,
       builder);
 
-  records = g_variant_new ("a(ssxxx)", builder);
-
-  g_variant_builder_unref (builder);
+  records = g_variant_builder_end (builder);
 
   hwangsae1_dbus_recorder_interface_complete_lookup_by_edge (object,
       invocation, records);
