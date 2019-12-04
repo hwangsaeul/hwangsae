@@ -46,5 +46,13 @@
       <summary>REST API connect port to relay</summary>
       <description>REST API port to use to connect to relay</description>
     </key>
+    <key name="external-ip" type="s">
+      <default>""</default>
+      <summary>Recorder external IP</summary>
+      <description>
+        When set, the recorder will use this IP address to build the URL to
+        access the recordings via HTTP.
+      </description>
+    </key>
   </schema>
 </schemalist>

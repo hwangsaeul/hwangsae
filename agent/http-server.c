@@ -37,6 +37,7 @@ struct _HwangsaeHttpServer
   guint port;
 
   gchar *recording_dir;
+  gchar *external_ip;
 };
 
 /* *INDENT-OFF* */
@@ -47,6 +48,7 @@ enum
 {
   PROP_PORT = 1,
   PROP_RECORDING_DIR,
+  PROP_EXTERNAL_IP,
   PROP_LAST
 };
 
@@ -106,7 +108,10 @@ hwangsae_http_server_get_url (HwangsaeHttpServer * server, gchar * edge_id,
     return g_strdup ("");
   }
 
-  local_ip = hwangsae_common_get_local_ip ();
+  if (server->external_ip && g_strcmp0 (server->external_ip, ""))
+    local_ip = g_strdup (server->external_ip);
+  else
+    local_ip = hwangsae_common_get_local_ip ();
 
   return g_strdup_printf ("http://%s:%d/%s/%s", local_ip, 8090, edge_id,
       file_id);
@@ -195,6 +200,9 @@ hwangsae_http_server_constructed (GObject * object)
   HwangsaeHttpServer *self = HWANGSAE_HTTP_SERVER (object);
   GError *error = NULL;
 
+  self->recording_dir = NULL;
+  self->external_ip = NULL;
+
   self->soup_server = soup_server_new (NULL, NULL);
   soup_server_add_handler (self->soup_server, NULL, http_cb, self, NULL);
 
@@ -218,6 +226,15 @@ hwangsae_http_server_set_property (GObject * object, guint property_id,
       g_clear_pointer (&self->recording_dir, g_free);
       self->recording_dir = g_strdup (g_value_get_string (value));
       break;
+    case PROP_EXTERNAL_IP:
+    {
+      const gchar *ip = g_value_get_string (value);
+      g_clear_pointer (&self->external_ip, g_free);
+      if (ip && ip[0] != '\0') {
+        self->external_ip = g_strdup (ip);
+      }
+      break;
+    }
     default:
       G_OBJECT_WARN_INVALID_PROPERTY_ID (object, property_id, pspec);
   }
@@ -235,6 +252,9 @@ hwangsae_http_server_get_property (GObject * object, guint property_id,
       break;
     case PROP_RECORDING_DIR:
       g_value_set_string (value, self->recording_dir);
+      break;
+    case PROP_EXTERNAL_IP:
+      g_value_set_string (value, self->external_ip);
       break;
     default:
       G_OBJECT_WARN_INVALID_PROPERTY_ID (object, property_id, pspec);
@@ -269,5 +289,10 @@ hwangsae_http_server_class_init (HwangsaeHttpServerClass * klass)
   g_object_class_install_property (gobject_class, PROP_RECORDING_DIR,
       g_param_spec_string ("recording-dir", "Recording Directory",
           "Recording Directory", "",
+          G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS));
+
+  g_object_class_install_property (gobject_class, PROP_EXTERNAL_IP,
+      g_param_spec_string ("external-ip", "External IP address",
+          "External IP address", "",
           G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS));
 }

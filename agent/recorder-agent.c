@@ -697,6 +697,9 @@ hwangsae_recorder_agent_init (HwangsaeRecorderAgent * self)
   g_settings_bind (self->settings, "recording-dir", self->hwangsae_http_server,
       "recording-dir", G_SETTINGS_BIND_DEFAULT);
 
+  g_settings_bind (self->settings, "external-ip", self->hwangsae_http_server,
+      "external-ip", G_SETTINGS_BIND_DEFAULT);
+
   self->manager = hwangsae1_dbus_manager_skeleton_new ();
 
   hwangsae1_dbus_manager_set_status (self->manager, 1);
