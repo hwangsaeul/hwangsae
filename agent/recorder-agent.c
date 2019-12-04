@@ -45,6 +45,11 @@ struct _HwangsaeRecorderAgent
   GSettings *settings;
   HwangsaeHttpServer *hwangsae_http_server;
 
+  gchar *recording_dir;
+  gchar *relay_address;
+  guint relay_api_port;
+  guint relay_stream_port;
+
   gboolean is_recording;
   gint64 recording_id;
 };
@@ -60,6 +65,16 @@ typedef enum
   RELAY_METHOD_STOP_STREAMING
 } relay_methods;
 
+
+enum
+{
+  PROP_RECORDING_DIR = 1,
+  PROP_RELAY_ADDRESS,
+  PROP_RELAY_API_PORT,
+  PROP_RELAY_STREAM_PORT,
+  PROP_LAST
+};
+
 static void
 hwangsae_recorder_agent_send_rest_api (HwangsaeRecorderAgent * self,
     relay_methods method, gchar * edge_id)
@@ -67,9 +82,8 @@ hwangsae_recorder_agent_send_rest_api (HwangsaeRecorderAgent * self,
   SoupSession *session;
   SoupMessage *msg;
   guint status;
-  g_autofree gchar *host =
-      g_settings_get_string (self->settings, "relay-address");
-  guint port = g_settings_get_uint (self->settings, "relay-api-port");
+  g_autofree gchar *host = g_strdup (self->relay_address);
+  guint port = self->relay_api_port;
   g_autofree gchar *url = NULL;
   g_autofree gchar *data = NULL;
   guint data_size = 0;
@@ -112,9 +126,8 @@ hwangsae_recorder_agent_start_recording (HwangsaeRecorderAgent * self,
     gchar * edge_id)
 {
   g_autoptr (GError) error = NULL;
-  g_autofree gchar *host =
-      g_settings_get_string (self->settings, "relay-address");
-  guint port = g_settings_get_uint (self->settings, "relay-stream-port");
+  g_autofree gchar *host = g_strdup (self->relay_address);
+  guint port = self->relay_stream_port;
   g_autofree gchar *streamid = NULL;
   g_autofree gchar *url = NULL;
   g_autofree gchar *recording_edge_dir = NULL;
@@ -137,8 +150,8 @@ hwangsae_recorder_agent_start_recording (HwangsaeRecorderAgent * self,
 
   g_debug ("starting to recording stream from %s", url);
 
-  g_autofree gchar *recording_dir =
-      g_settings_get_string (self->settings, "recording-dir");
+  g_autofree gchar *recording_dir = g_strdup (self->recording_dir);
+
   if (g_str_equal (recording_dir, "")) {
     g_free (recording_dir);
     recording_dir = g_build_filename (g_get_user_data_dir (),
@@ -443,7 +456,7 @@ gboolean
   HwangsaeRecorderAgent *self = (HwangsaeRecorderAgent *) user_data;
   g_autofree gchar *cmd = NULL;
   g_autofree gchar *response = NULL;
-  g_autofree gchar *recording_dir;
+  g_autofree gchar *recording_dir = NULL;
   g_autofree gchar *edge_id = NULL;
   GVariantBuilder *builder;
   GVariant *records;
@@ -451,7 +464,7 @@ gboolean
   g_debug
       ("hwangsae_recorder_agent_recorder_interface_handle_lookup_by_record");
 
-  recording_dir = g_settings_get_string (self->settings, "recording-dir");
+  recording_dir = g_strdup (self->recording_dir);
 
   builder = g_variant_builder_new (G_VARIANT_TYPE ("a(sxxx)"));
 
@@ -483,7 +496,7 @@ gboolean
 
   g_debug ("hwangsae_recorder_agent_recorder_interface_handle_lookup_by_edge");
 
-  recording_dir = g_settings_get_string (self->settings, "recording-dir");
+  recording_dir = g_strdup (self->recording_dir);
 
   builder = g_variant_builder_new (G_VARIANT_TYPE ("a(ssxxx)"));
 
@@ -565,10 +578,82 @@ hwangsae_recorder_agent_dispose (GObject * object)
 }
 
 static void
+hwangsae_recorder_agent_set_property (GObject * object, guint property_id,
+    const GValue * value, GParamSpec * pspec)
+{
+  HwangsaeRecorderAgent *self = HWANGSAE_RECORDER_AGENT (object);
+
+  switch (property_id) {
+    case PROP_RECORDING_DIR:
+      g_clear_pointer (&self->recording_dir, g_free);
+      self->recording_dir = g_strdup (g_value_get_string (value));
+      break;
+    case PROP_RELAY_ADDRESS:
+      g_clear_pointer (&self->relay_address, g_free);
+      self->relay_address = g_strdup (g_value_get_string (value));
+      break;
+    case PROP_RELAY_API_PORT:
+      self->relay_api_port = g_value_get_uint (value);
+      break;
+    case PROP_RELAY_STREAM_PORT:
+      self->relay_stream_port = g_value_get_uint (value);
+      break;
+    default:
+      G_OBJECT_WARN_INVALID_PROPERTY_ID (object, property_id, pspec);
+  }
+}
+
+static void
+hwangsae_recorder_agent_get_property (GObject * object, guint property_id,
+    GValue * value, GParamSpec * pspec)
+{
+  HwangsaeRecorderAgent *self = HWANGSAE_RECORDER_AGENT (object);
+
+  switch (property_id) {
+    case PROP_RECORDING_DIR:
+      g_value_set_string (value, self->recording_dir);
+      break;
+    case PROP_RELAY_ADDRESS:
+      g_value_set_string (value, self->relay_address);
+      break;
+    case PROP_RELAY_API_PORT:
+      g_value_set_uint (value, self->relay_api_port);
+      break;
+    case PROP_RELAY_STREAM_PORT:
+      g_value_set_uint (value, self->relay_stream_port);
+      break;
+    default:
+      G_OBJECT_WARN_INVALID_PROPERTY_ID (object, property_id, pspec);
+  }
+}
+
+static void
 hwangsae_recorder_agent_class_init (HwangsaeRecorderAgentClass * klass)
 {
   GObjectClass *gobject_class = G_OBJECT_CLASS (klass);
   GApplicationClass *app_class = G_APPLICATION_CLASS (klass);
+
+  gobject_class->set_property = hwangsae_recorder_agent_set_property;
+  gobject_class->get_property = hwangsae_recorder_agent_get_property;
+
+  g_object_class_install_property (gobject_class, PROP_RECORDING_DIR,
+      g_param_spec_string ("recording-dir", "Recording Directory",
+          "Recording Directory", "",
+          G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS));
+
+  g_object_class_install_property (gobject_class, PROP_RELAY_ADDRESS,
+      g_param_spec_string ("relay-address", "Relay IP address",
+          "Relay IP address", "", G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS));
+
+  g_object_class_install_property (gobject_class, PROP_RELAY_API_PORT,
+      g_param_spec_uint ("relay-api-port", "Relay TCP API port",
+          "Relay TCP API port", 0, G_MAXUINT, 8080,
+          G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS));
+
+  g_object_class_install_property (gobject_class, PROP_RELAY_STREAM_PORT,
+      g_param_spec_uint ("relay-stream-port", "Relay Stream port",
+          "Relay Stream port", 0, G_MAXUINT, 9999,
+          G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS));
 
   gobject_class->dispose = hwangsae_recorder_agent_dispose;
 
@@ -587,21 +672,30 @@ signal_handler (GApplication * app)
 static void
 hwangsae_recorder_agent_init (HwangsaeRecorderAgent * self)
 {
-  g_autofree gchar *recording_dir;
-
   self->is_recording = FALSE;
 
   self->settings = g_settings_new (HWANGSAE_RECORDER_SCHEMA_ID);
 
-  recording_dir = g_settings_get_string (self->settings, "recording-dir");
+  g_settings_bind (self->settings, "recording-dir", self, "recording-dir",
+      G_SETTINGS_BIND_DEFAULT);
+
+  g_settings_bind (self->settings, "relay-address", self, "relay-address",
+      G_SETTINGS_BIND_DEFAULT);
+
+  g_settings_bind (self->settings, "relay-api-port", self, "relay-api-port",
+      G_SETTINGS_BIND_DEFAULT);
+
+  g_settings_bind (self->settings, "relay-stream-port", self,
+      "relay-stream-port", G_SETTINGS_BIND_DEFAULT);
 
   self->recorder = hwangsae_recorder_new ();
 
   self->hwangsae_http_server =
       hwangsae_http_server_new (g_settings_get_uint (self->settings,
           "http-port"));
-  hwangsae_http_server_set_recording_dir (self->hwangsae_http_server,
-      recording_dir);
+
+  g_settings_bind (self->settings, "recording-dir", self->hwangsae_http_server,
+      "recording-dir", G_SETTINGS_BIND_DEFAULT);
 
   self->manager = hwangsae1_dbus_manager_skeleton_new ();
 
