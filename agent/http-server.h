@@ -29,11 +29,6 @@ G_DECLARE_FINAL_TYPE                (HwangsaeHttpServer, hwangsae_http_server, H
 
 HwangsaeHttpServer     *hwangsae_http_server_new (guint16 port);
 
-gchar                  *hwangsae_http_server_get_recording_dir (HwangsaeHttpServer *server);
-
-void                    hwangsae_http_server_set_recording_dir (HwangsaeHttpServer *server,
-                                                                gchar              *recording_dir);
-
 gchar                  *hwangsae_http_server_get_url           (HwangsaeHttpServer *server,
                                                                 gchar              *edge_id,
                                                                 gchar              *file_id);

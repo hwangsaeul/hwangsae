@@ -46,6 +46,7 @@ G_DEFINE_TYPE (HwangsaeHttpServer, hwangsae_http_server, G_TYPE_OBJECT)
 enum
 {
   PROP_PORT = 1,
+  PROP_RECORDING_DIR,
   PROP_LAST
 };
 
@@ -54,20 +55,6 @@ hwangsae_http_server_new (guint16 port)
 {
   return HWANGSAE_HTTP_SERVER (g_object_new (HWANGSAE_TYPE_HTTP_SERVER,
           "port", port, NULL));
-}
-
-gchar *
-hwangsae_http_server_get_recording_dir (HwangsaeHttpServer * server)
-{
-  return server->recording_dir;
-}
-
-void
-hwangsae_http_server_set_recording_dir (HwangsaeHttpServer * server,
-    gchar * recording_dir)
-{
-  g_free (server->recording_dir);
-  server->recording_dir = g_strdup (recording_dir);
 }
 
 static gchar *
@@ -227,6 +214,28 @@ hwangsae_http_server_set_property (GObject * object, guint property_id,
     case PROP_PORT:
       self->port = g_value_get_uint (value);
       break;
+    case PROP_RECORDING_DIR:
+      g_clear_pointer (&self->recording_dir, g_free);
+      self->recording_dir = g_strdup (g_value_get_string (value));
+      break;
+    default:
+      G_OBJECT_WARN_INVALID_PROPERTY_ID (object, property_id, pspec);
+  }
+}
+
+static void
+hwangsae_http_server_get_property (GObject * object, guint property_id,
+    GValue * value, GParamSpec * pspec)
+{
+  HwangsaeHttpServer *self = HWANGSAE_HTTP_SERVER (object);
+
+  switch (property_id) {
+    case PROP_PORT:
+      g_value_set_uint (value, self->port);
+      break;
+    case PROP_RECORDING_DIR:
+      g_value_set_string (value, self->recording_dir);
+      break;
     default:
       G_OBJECT_WARN_INVALID_PROPERTY_ID (object, property_id, pspec);
   }
@@ -249,6 +258,7 @@ hwangsae_http_server_class_init (HwangsaeHttpServerClass * klass)
 
   gobject_class->constructed = hwangsae_http_server_constructed;
   gobject_class->set_property = hwangsae_http_server_set_property;
+  gobject_class->get_property = hwangsae_http_server_get_property;
   gobject_class->dispose = hwangsae_http_server_dispose;
 
   g_object_class_install_property (gobject_class, PROP_PORT,
@@ -256,4 +266,8 @@ hwangsae_http_server_class_init (HwangsaeHttpServerClass * klass)
           0, G_MAXUINT16, 8080,
           G_PARAM_WRITABLE | G_PARAM_CONSTRUCT_ONLY | G_PARAM_STATIC_STRINGS));
 
+  g_object_class_install_property (gobject_class, PROP_RECORDING_DIR,
+      g_param_spec_string ("recording-dir", "Recording Directory",
+          "Recording Directory", "",
+          G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS));
 }
