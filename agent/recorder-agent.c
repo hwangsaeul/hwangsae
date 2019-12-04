@@ -357,11 +357,8 @@ get_records (gchar * recording_dir, gchar * arg_edge_id, gchar * arg_record_id,
   }
 
   dir = g_dir_open (recording_dir, 0, &error);
-  if (error) {
-    g_dir_close (dir);
-    g_error_free (error);
+  if (error)
     return NULL;
-  }
 
   while ((filename = g_dir_read_name (dir)) && !records_found) {
     g_autofree gchar *recording_edge_dir = NULL;
