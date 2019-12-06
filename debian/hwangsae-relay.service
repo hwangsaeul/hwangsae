@@ -1,0 +1,11 @@
+[Unit]
+Description=SRT relay of Hwansaeul
+
+[Service]
+Type=simple
+Environment=GSETTINGS_BACKEND=keyfile
+ExecStart=/usr/bin/hwangsae-relay-agent
+Restart=on-failure
+
+[Install]
+WantedBy=multi-user.target
