@@ -15,6 +15,8 @@
  *  limitations under the License.
  *
  */
-#include <glib.h>
+#include <gio/gio.h>
 
-gchar           *hwangsae_common_get_local_ip (void);
+gchar           *hwangsae_common_get_local_ip  (void);
+
+GSettings       *hwangsae_common_gsettings_new (const gchar * schema_id);

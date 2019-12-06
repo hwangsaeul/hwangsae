@@ -460,7 +460,8 @@ hwangsae_recorder_init (HwangsaeRecorder * self)
   HwangsaeRecorderPrivate *priv = hwangsae_recorder_get_instance_private (self);
   g_autofree gchar *dir = NULL;
 
-  priv->settings = g_settings_new ("org.hwangsaeul.hwangsae.recorder");
+  priv->settings =
+      hwangsae_common_gsettings_new ("org.hwangsaeul.hwangsae.recorder");
 
   dir = g_build_filename (g_get_user_data_dir (),
       "hwangsaeul", "hwangsae", "recordings", NULL);

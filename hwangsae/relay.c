@@ -492,7 +492,8 @@ hwangsae_relay_init (HwangsaeRelay * self)
 
   g_mutex_init (&self->lock);
 
-  self->settings = g_settings_new ("org.hwangsaeul.hwangsae.relay");
+  self->settings =
+      hwangsae_common_gsettings_new ("org.hwangsaeul.hwangsae.relay");
 
   g_settings_bind (self->settings, "sink-port", self, "sink-port",
       G_SETTINGS_BIND_DEFAULT);
