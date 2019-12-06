@@ -20,13 +20,12 @@
 #ifndef __HWANGSAE_RELAY_AGENT_H__
 #define __HWANGSAE_RELAY_AGENT_H__
 
-#include <glib-object.h>
-#include <gio/gio.h>
+#include <hwangsaeul/application.h>
 
 G_BEGIN_DECLS
 
 #define HWANGSAE_TYPE_RELAY_AGENT       (hwangsae_relay_agent_get_type ())
-G_DECLARE_FINAL_TYPE                    (HwangsaeRelayAgent, hwangsae_relay_agent, HWANGSAE, RELAY_AGENT, GApplication)
+G_DECLARE_FINAL_TYPE                    (HwangsaeRelayAgent, hwangsae_relay_agent, HWANGSAE, RELAY_AGENT, HwangsaeulApplication)
 
 G_END_DECLS
 

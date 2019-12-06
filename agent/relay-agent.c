@@ -33,7 +33,7 @@
 
 struct _HwangsaeRelayAgent
 {
-  GApplication parent;
+  HwangsaeulApplication parent;
 
   HwangsaeRelay *relay;
   Hwangsae1DBusManager *manager;
@@ -42,7 +42,7 @@ struct _HwangsaeRelayAgent
 };
 
 /* *INDENT-OFF* */
-G_DEFINE_TYPE (HwangsaeRelayAgent, hwangsae_relay_agent, G_TYPE_APPLICATION)
+G_DEFINE_TYPE (HwangsaeRelayAgent, hwangsae_relay_agent, HWANGSAEUL_TYPE_APPLICATION)
 /* *INDENT-ON* */
 
 static gboolean
@@ -290,5 +290,5 @@ main (int argc, char *argv[])
 
   g_application_hold (app);
 
-  return g_application_run (app, argc, argv);
+  return hwangsaeul_application_run (HWANGSAEUL_APPLICATION (app), argc, argv);
 }
