@@ -20,5 +20,5 @@ executable('hwangsae-recorder-agent',
   install: true,
   include_directories: hwangsae_incs,
   c_args: [ hwangsae_agent_c_args, ],
-  dependencies: [ libhwangsae_dbus_dep, libhwangsae_dep, gstreamer_dep,
-                 soup_dep, json_glib_dep],)
+  dependencies: [ libhwangsae_dbus_dep, libhwangsae_dep, chamge_dep,
+                 gstreamer_dep, soup_dep, json_glib_dep],)

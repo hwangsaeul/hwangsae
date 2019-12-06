@@ -20,6 +20,7 @@
 
 #include "recorder-agent.h"
 #include "http-server.h"
+#include <chamge/chamge.h>
 #include <hwangsae/recorder.h>
 #include <glib/gstdio.h>
 #include <gst/gst.h>
@@ -672,7 +673,7 @@ hwangsae_recorder_agent_init (HwangsaeRecorderAgent * self)
 {
   self->is_recording = FALSE;
 
-  self->settings = g_settings_new (HWANGSAE_RECORDER_SCHEMA_ID);
+  self->settings = chamge_common_gsettings_new (HWANGSAE_RECORDER_SCHEMA_ID);
 
   g_settings_bind (self->settings, "recording-dir", self, "recording-dir",
       G_SETTINGS_BIND_DEFAULT);
