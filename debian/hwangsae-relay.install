@@ -1,1 +1,2 @@
 usr/bin/hwangsae-relay-agent
+usr/share/dbus-1/system.d/org.hwangsaeul.Hwangsae1.RelayAgent.conf

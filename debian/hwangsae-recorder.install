@@ -1,1 +1,2 @@
 usr/bin/hwangsae-recorder-agent
+usr/share/dbus-1/system.d/org.hwangsaeul.Hwangsae1.RecorderAgent.conf
