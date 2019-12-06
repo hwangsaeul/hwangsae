@@ -9,7 +9,10 @@ dbus_ifaces = [
   [ 'RecorderInterface', 'recorder-interface-generated' ],
 ]
 
-dbus_headers = []
+dbus_configs = [
+  'org.hwangsaeul.Hwangsae1.RelayAgent.conf',
+  'org.hwangsaeul.Hwangsae1.RecorderAgent.conf',
+]
 
 foreach iface: dbus_ifaces
   prefix = 'org.hwangsaeul.Hwangsae1.'
@@ -25,7 +28,7 @@ endforeach
 
 libhwangsae_dbus = shared_library(
   'hwangsae-dbus-@0@'.format(apiversion),
-  sources, dbus_headers,
+  sources,
   version: libversion,
   soversion: soversion,
   include_directories: hwangsae_incs,
@@ -39,3 +42,10 @@ libhwangsae_dbus_dep = declare_dependency(link_with: libhwangsae_dbus,
   include_directories: [ hwangsae_incs ],
   dependencies: [ gio_dep ]
 )
+
+foreach config: dbus_configs
+  install_data(
+    config,
+    install_dir : join_paths(get_option('datadir'), 'dbus-1', 'system.d')
+  )
+endforeach
