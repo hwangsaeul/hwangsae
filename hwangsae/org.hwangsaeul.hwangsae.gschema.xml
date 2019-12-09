@@ -54,5 +54,10 @@
         access the recordings via HTTP.
       </description>
     </key>
+    <key name="recorder-id" type="s">
+      <default>"randomized-string"</default>
+      <summary>Recorder ID</summary>
+      <description>Unique identifier for the Recorder Agent</description>
+    </key>
   </schema>
 </schemalist>
