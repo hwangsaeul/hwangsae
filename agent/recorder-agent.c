@@ -248,10 +248,14 @@ hwangsae_recorder_agent_dbus_unregister (GApplication * app,
       (app, connection, object_path);
 }
 
+/* *INDENT-OFF* */
 gboolean
-    hwangsae_recorder_agent_recorder_interface_handle_start
+hwangsae_recorder_agent_recorder_interface_handle_start
     (Hwangsae1DBusRecorderInterface * object,
-    GDBusMethodInvocation * invocation, gchar * arg_id, gpointer user_data) {
+    GDBusMethodInvocation * invocation, gchar * arg_id, gpointer user_data)
+/* *INDENT-ON* */
+
+{
   g_autofree gchar *cmd = NULL;
   g_autofree gchar *response = NULL;
   g_autofree gchar *record_id = NULL;
@@ -275,10 +279,14 @@ gboolean
   return TRUE;
 }
 
+/* *INDENT-OFF* */
 gboolean
-    hwangsae_recorder_agent_recorder_interface_handle_stop
+hwangsae_recorder_agent_recorder_interface_handle_stop
     (Hwangsae1DBusRecorderInterface * object,
-    GDBusMethodInvocation * invocation, gchar * arg_id, gpointer user_data) {
+    GDBusMethodInvocation * invocation, gchar * arg_id, gpointer user_data)
+/* *INDENT-ON* */
+
+{
   g_autofree gchar *cmd = NULL;
   g_autofree gchar *response = NULL;
 
@@ -450,11 +458,15 @@ get_records (gchar * recording_dir, gchar * arg_edge_id, gchar * arg_record_id,
   return edge_id;
 }
 
+/* *INDENT-OFF* */
 gboolean
-    hwangsae_recorder_agent_recorder_interface_handle_lookup_by_record
+hwangsae_recorder_agent_recorder_interface_handle_lookup_by_record
     (Hwangsae1DBusRecorderInterface * object,
     GDBusMethodInvocation * invocation, gchar * arg_record_id, gint64 arg_from,
-    gint64 arg_to, gpointer user_data) {
+    gint64 arg_to, gpointer user_data)
+/* *INDENT-ON* */
+
+{
   HwangsaeRecorderAgent *self = (HwangsaeRecorderAgent *) user_data;
   g_autofree gchar *cmd = NULL;
   g_autofree gchar *response = NULL;
@@ -481,11 +493,15 @@ gboolean
   return TRUE;
 }
 
+/* *INDENT-OFF* */
 gboolean
-    hwangsae_recorder_agent_recorder_interface_handle_lookup_by_edge
+hwangsae_recorder_agent_recorder_interface_handle_lookup_by_edge
     (Hwangsae1DBusRecorderInterface * object,
     GDBusMethodInvocation * invocation, gchar * arg_edge_id, gint64 arg_from,
-    gint64 arg_to, gpointer user_data) {
+    gint64 arg_to, gpointer user_data)
+/* *INDENT-ON* */
+
+{
   HwangsaeRecorderAgent *self = (HwangsaeRecorderAgent *) user_data;
   g_autofree gchar *cmd = NULL;
   g_autofree gchar *response = NULL;
@@ -511,11 +527,15 @@ gboolean
   return TRUE;
 }
 
+/* *INDENT-OFF* */
 gboolean
 hwangsae_recorder_agent_recorder_interface_handle_url
     (Hwangsae1DBusRecorderInterface * object,
     GDBusMethodInvocation * invocation, gchar * arg_edge_id,
-    gchar * arg_file_id, gpointer user_data) {
+    gchar * arg_file_id, gpointer user_data)
+/* *INDENT-ON* */
+
+{
   HwangsaeRecorderAgent *self = (HwangsaeRecorderAgent *) user_data;
   g_autofree gchar *cmd = NULL;
   g_autofree gchar *response = NULL;
@@ -533,11 +553,15 @@ hwangsae_recorder_agent_recorder_interface_handle_url
   return TRUE;
 }
 
+/* *INDENT-OFF* */
 gboolean
 hwangsae_recorder_agent_recorder_interface_handle_delete
     (Hwangsae1DBusRecorderInterface * object,
     GDBusMethodInvocation * invocation, gchar * arg_edge_id,
-    gchar * arg_file_id, gpointer user_data) {
+    gchar * arg_file_id, gpointer user_data)
+/* *INDENT-ON* */
+
+{
   HwangsaeRecorderAgent *self = (HwangsaeRecorderAgent *) user_data;
   g_autofree gchar *cmd = NULL;
   g_autofree gchar *response = NULL;
