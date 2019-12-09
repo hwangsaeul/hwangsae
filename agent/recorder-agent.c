@@ -50,6 +50,7 @@ struct _HwangsaeRecorderAgent
   gchar *relay_address;
   guint relay_api_port;
   guint relay_stream_port;
+  gchar *recorder_id;
 
   gboolean is_recording;
   gint64 recording_id;
@@ -73,6 +74,7 @@ enum
   PROP_RELAY_ADDRESS,
   PROP_RELAY_API_PORT,
   PROP_RELAY_STREAM_PORT,
+  PROP_RECORDER_ID,
   PROP_LAST
 };
 
@@ -146,7 +148,7 @@ hwangsae_recorder_agent_start_recording (HwangsaeRecorderAgent * self,
   hwangsae_recorder_agent_send_rest_api (self, RELAY_METHOD_START_STREAMING,
       edge_id);
 
-  streamid_tmp = g_strdup_printf ("#!::r=%s", edge_id);
+  streamid_tmp = g_strdup_printf ("#!::r=%s,u=%s", edge_id, self->recorder_id);
   streamid = g_uri_escape_string (streamid_tmp, NULL, FALSE);
   url = g_strdup_printf ("srt://%s:%d?streamid=%s", host, port, streamid);
 
@@ -621,6 +623,10 @@ hwangsae_recorder_agent_set_property (GObject * object, guint property_id,
     case PROP_RELAY_STREAM_PORT:
       self->relay_stream_port = g_value_get_uint (value);
       break;
+    case PROP_RECORDER_ID:
+      g_clear_pointer (&self->recorder_id, g_free);
+      self->recorder_id = g_value_dup_string (value);
+      break;
     default:
       G_OBJECT_WARN_INVALID_PROPERTY_ID (object, property_id, pspec);
   }
@@ -644,6 +650,9 @@ hwangsae_recorder_agent_get_property (GObject * object, guint property_id,
       break;
     case PROP_RELAY_STREAM_PORT:
       g_value_set_uint (value, self->relay_stream_port);
+      break;
+    case PROP_RECORDER_ID:
+      g_value_set_string (value, self->recorder_id);
       break;
     default:
       G_OBJECT_WARN_INVALID_PROPERTY_ID (object, property_id, pspec);
@@ -678,6 +687,9 @@ hwangsae_recorder_agent_class_init (HwangsaeRecorderAgentClass * klass)
           "Relay Stream port", 0, G_MAXUINT, 9999,
           G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS));
 
+  g_object_class_install_property (gobject_class, PROP_RECORDER_ID,
+      g_param_spec_string ("recorder-id", "Recorder ID",
+          "Recorder ID", "", G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS));
   gobject_class->dispose = hwangsae_recorder_agent_dispose;
 
   app_class->dbus_register = hwangsae_recorder_agent_dbus_register;
@@ -710,6 +722,18 @@ hwangsae_recorder_agent_init (HwangsaeRecorderAgent * self)
 
   g_settings_bind (self->settings, "relay-stream-port", self,
       "relay-stream-port", G_SETTINGS_BIND_DEFAULT);
+
+  g_settings_bind (self->settings, "recorder-id", self, "recorder-id",
+      G_SETTINGS_BIND_DEFAULT);
+
+  if (!g_strcmp0 (self->recorder_id, "randomized-string")
+      || strnlen (self->recorder_id, 64) == 0) {
+    g_autofree gchar *uid = g_uuid_string_random ();
+    g_autofree gchar *recorder_id =
+        g_compute_checksum_for_string (G_CHECKSUM_SHA256, uid, strnlen (uid,
+            64));
+    g_object_set (self, "recorder-id", recorder_id, NULL);
+  }
 
   self->recorder = hwangsae_recorder_new ();
 
