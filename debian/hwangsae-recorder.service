@@ -1,0 +1,11 @@
+[Unit]
+Description=Stream recorder of Hwansaeul
+
+[Service]
+Type=simple
+Environment=GSETTINGS_BACKEND=keyfile
+ExecStart=/usr/bin/hwangsae-recorder-agent
+Restart=on-failure
+
+[Install]
+WantedBy=multi-user.target
