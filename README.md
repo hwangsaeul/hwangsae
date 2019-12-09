@@ -168,7 +168,7 @@ In the above APIs these ids are used
 ## Build from sources
 To build the from sources follow the procedure described in
 
-[Build from sources](https://http://hwangsaeul.github.io/build_from_sources)
+[Build from sources](https://github.com/hwangsaeul/hwangsaeul.github.io/blob/master/build_from_sources.md)
 
 ## Run
 After building from sources Hwangsae Relay Agent can be run with
