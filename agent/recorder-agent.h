@@ -20,12 +20,11 @@
 #ifndef __HWANGSAE_RECORDER_AGENT_H__
 #define __HWANGSAE_RECORDER_AGENT_H__
 
-#include <glib-object.h>
-#include <gio/gio.h>
+#include <hwangsaeul/application.h>
 
 G_BEGIN_DECLS
 #define HWANGSAE_TYPE_RECORDER_AGENT    (hwangsae_recorder_agent_get_type ())
 G_DECLARE_FINAL_TYPE (HwangsaeRecorderAgent, hwangsae_recorder_agent, HWANGSAE,
-    RECORDER_AGENT, GApplication)
+    RECORDER_AGENT, HwangsaeulApplication)
     G_END_DECLS
 #endif                          // __HWANGSAE_RECORDER_AGENT_H__

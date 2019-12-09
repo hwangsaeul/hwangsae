@@ -38,7 +38,7 @@
 
 struct _HwangsaeRecorderAgent
 {
-  GApplication parent;
+  HwangsaeulApplication parent;
 
   HwangsaeRecorder *recorder;
   Hwangsae1DBusManager *manager;
@@ -56,7 +56,7 @@ struct _HwangsaeRecorderAgent
 };
 
 /* *INDENT-OFF* */
-G_DEFINE_TYPE (HwangsaeRecorderAgent, hwangsae_recorder_agent, G_TYPE_APPLICATION)
+G_DEFINE_TYPE (HwangsaeRecorderAgent, hwangsae_recorder_agent, HWANGSAEUL_TYPE_APPLICATION)
 /* *INDENT-ON* */
 
 typedef enum
@@ -747,5 +747,5 @@ main (int argc, char *argv[])
 
   g_application_hold (app);
 
-  return g_application_run (app, argc, argv);
+  return hwangsaeul_application_run (HWANGSAEUL_APPLICATION (app), argc, argv);
 }
