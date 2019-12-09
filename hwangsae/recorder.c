@@ -18,6 +18,7 @@
 
 #include "recorder.h"
 
+#include "common.h"
 #include "enumtypes.h"
 
 #include <glib/gstdio.h>
