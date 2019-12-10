@@ -256,7 +256,7 @@ hwangsae_recorder_agent_dbus_unregister (GApplication * app,
 gboolean
 hwangsae_recorder_agent_recorder_interface_handle_start
     (Hwangsae1DBusRecorderInterface * object,
-    GDBusMethodInvocation * invocation, gchar * arg_id, gpointer user_data)
+    GDBusMethodInvocation * invocation, gchar * arg_edge_id, gpointer user_data)
 /* *INDENT-ON* */
 
 {
@@ -270,7 +270,7 @@ hwangsae_recorder_agent_recorder_interface_handle_start
   g_debug ("hwangsae_recorder_agent_recorder_interface_handle_start, cmd %s",
       cmd);
 
-  rec_id = hwangsae_recorder_agent_start_recording (self, arg_id);
+  rec_id = hwangsae_recorder_agent_start_recording (self, arg_edge_id);
 
   if (rec_id > 0)
     record_id = g_strdup_printf ("%ld", rec_id);
@@ -287,7 +287,7 @@ hwangsae_recorder_agent_recorder_interface_handle_start
 gboolean
 hwangsae_recorder_agent_recorder_interface_handle_stop
     (Hwangsae1DBusRecorderInterface * object,
-    GDBusMethodInvocation * invocation, gchar * arg_id, gpointer user_data)
+    GDBusMethodInvocation * invocation, gchar * arg_edge_id, gpointer user_data)
 /* *INDENT-ON* */
 
 {
@@ -299,7 +299,7 @@ hwangsae_recorder_agent_recorder_interface_handle_stop
   g_debug ("hwangsae_recorder_agent_recorder_interface_handle_stop, cmd %s",
       cmd);
 
-  hwangsae_recorder_agent_stop_recording (self, arg_id);
+  hwangsae_recorder_agent_stop_recording (self, arg_edge_id);
 
   hwangsae1_dbus_recorder_interface_complete_stop (object, invocation);
 
