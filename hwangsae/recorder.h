@@ -51,6 +51,19 @@ void                    hwangsae_recorder_set_max_size_bytes
 
 guint64                 hwangsae_recorder_get_max_size_bytes
                                                        (HwangsaeRecorder * self);
+void                    hwangsae_recorder_set_recording_dir
+                                                       (HwangsaeRecorder * self,
+                                                        gchar *recording_dir);
+
+gchar                  *hwangsae_recorder_get_recording_dir
+                                                       (HwangsaeRecorder * self);
+
+void                    hwangsae_recorder_set_filename_prefix
+                                                       (HwangsaeRecorder * self,
+                                                        gchar *filename_prefix);
+
+gchar                  *hwangsae_recorder_get_filename_prefix
+                                                       (HwangsaeRecorder * self);
 
 void                    hwangsae_recorder_start_recording
                                                        (HwangsaeRecorder * self,

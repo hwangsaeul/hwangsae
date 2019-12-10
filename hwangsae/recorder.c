@@ -131,6 +131,40 @@ hwangsae_recorder_get_max_size_bytes (HwangsaeRecorder * self)
   return result;
 }
 
+void
+hwangsae_recorder_set_recording_dir (HwangsaeRecorder * self,
+    gchar * recording_dir)
+{
+  g_object_set (self, "recording-dir", recording_dir, NULL);
+}
+
+gchar *
+hwangsae_recorder_get_recording_dir (HwangsaeRecorder * self)
+{
+  gchar *result;
+
+  g_object_get (self, "recording-dir", &result, NULL);
+
+  return result;
+}
+
+void
+hwangsae_recorder_set_filename_prefix (HwangsaeRecorder * self,
+    gchar * filename_prefix)
+{
+  g_object_set (self, "filename-prefix", filename_prefix, NULL);
+}
+
+gchar *
+hwangsae_recorder_get_filename_prefix (HwangsaeRecorder * self)
+{
+  gchar *result;
+
+  g_object_get (self, "filename-prefix", &result, NULL);
+
+  return result;
+}
+
 static void
 hwangsae_recorder_stop_recording_internal (HwangsaeRecorder * self)
 {
