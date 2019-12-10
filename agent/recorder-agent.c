@@ -611,7 +611,7 @@ hwangsae_recorder_agent_set_property (GObject * object, guint property_id,
   switch (property_id) {
     case PROP_RECORDING_DIR:
       g_clear_pointer (&self->recording_dir, g_free);
-      self->recording_dir = g_strdup (g_value_get_string (value));
+      self->recording_dir = g_value_dup_string (value);
       break;
     case PROP_RELAY_ADDRESS:
       g_clear_pointer (&self->relay_address, g_free);
