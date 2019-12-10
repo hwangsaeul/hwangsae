@@ -65,7 +65,7 @@ typedef enum
   RELAY_METHOD_NONE = 0,
   RELAY_METHOD_START_STREAMING,
   RELAY_METHOD_STOP_STREAMING
-} relay_methods;
+} RelayMethods;
 
 
 enum
@@ -80,7 +80,7 @@ enum
 
 static void
 hwangsae_recorder_agent_send_rest_api (HwangsaeRecorderAgent * self,
-    relay_methods method, gchar * edge_id)
+    RelayMethods method, gchar * edge_id)
 {
   SoupSession *session;
   SoupMessage *msg;
