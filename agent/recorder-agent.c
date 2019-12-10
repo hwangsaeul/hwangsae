@@ -260,15 +260,12 @@ hwangsae_recorder_agent_recorder_interface_handle_start
 /* *INDENT-ON* */
 
 {
-  g_autofree gchar *cmd = NULL;
-  g_autofree gchar *response = NULL;
   g_autofree gchar *record_id = NULL;
   gint64 rec_id;
 
   HwangsaeRecorderAgent *self = (HwangsaeRecorderAgent *) user_data;
 
-  g_debug ("hwangsae_recorder_agent_recorder_interface_handle_start, cmd %s",
-      cmd);
+  g_debug ("hwangsae_recorder_agent_recorder_interface_handle_start");
 
   rec_id = hwangsae_recorder_agent_start_recording (self, arg_edge_id);
 
@@ -291,13 +288,9 @@ hwangsae_recorder_agent_recorder_interface_handle_stop
 /* *INDENT-ON* */
 
 {
-  g_autofree gchar *cmd = NULL;
-  g_autofree gchar *response = NULL;
-
   HwangsaeRecorderAgent *self = (HwangsaeRecorderAgent *) user_data;
 
-  g_debug ("hwangsae_recorder_agent_recorder_interface_handle_stop, cmd %s",
-      cmd);
+  g_debug ("hwangsae_recorder_agent_recorder_interface_handle_stop");
 
   hwangsae_recorder_agent_stop_recording (self, arg_edge_id);
 
@@ -472,8 +465,6 @@ hwangsae_recorder_agent_recorder_interface_handle_lookup_by_record
 
 {
   HwangsaeRecorderAgent *self = (HwangsaeRecorderAgent *) user_data;
-  g_autofree gchar *cmd = NULL;
-  g_autofree gchar *response = NULL;
   g_autofree gchar *recording_dir = NULL;
   g_autofree gchar *edge_id = NULL;
   g_autoptr (GVariantBuilder) builder = NULL;
@@ -507,8 +498,6 @@ hwangsae_recorder_agent_recorder_interface_handle_lookup_by_edge
 
 {
   HwangsaeRecorderAgent *self = (HwangsaeRecorderAgent *) user_data;
-  g_autofree gchar *cmd = NULL;
-  g_autofree gchar *response = NULL;
   g_autofree gchar *recording_dir = NULL;
   g_autofree gchar *edge_id = NULL;
   g_autoptr (GVariantBuilder) builder = NULL;
@@ -541,8 +530,6 @@ hwangsae_recorder_agent_recorder_interface_handle_url
 
 {
   HwangsaeRecorderAgent *self = (HwangsaeRecorderAgent *) user_data;
-  g_autofree gchar *cmd = NULL;
-  g_autofree gchar *response = NULL;
   g_autofree gchar *url = NULL;
 
   g_debug ("hwangsae_recorder_agent_recorder_interface_handle_url");
@@ -567,8 +554,6 @@ hwangsae_recorder_agent_recorder_interface_handle_delete
 
 {
   HwangsaeRecorderAgent *self = (HwangsaeRecorderAgent *) user_data;
-  g_autofree gchar *cmd = NULL;
-  g_autofree gchar *response = NULL;
   g_autofree gchar *filename = NULL;
 
   g_debug ("hwangsae_recorder_agent_recorder_interface_handle_delete");
