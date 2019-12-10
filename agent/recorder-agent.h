@@ -23,8 +23,50 @@
 #include <hwangsaeul/application.h>
 
 G_BEGIN_DECLS
+#ifndef _RECORDER_AGENT_EXTERN
+#define _RECORDER_AGENT_EXTERN         extern
+#endif
+#define RECORDER_AGENT_API_EXPORT      _RECORDER_AGENT_EXTERN
 #define HWANGSAE_TYPE_RECORDER_AGENT    (hwangsae_recorder_agent_get_type ())
-G_DECLARE_FINAL_TYPE (HwangsaeRecorderAgent, hwangsae_recorder_agent, HWANGSAE,
-    RECORDER_AGENT, HwangsaeulApplication)
-    G_END_DECLS
-#endif                          // __HWANGSAE_RECORDER_AGENT_H__
+/* *INDENT-OFF* */
+RECORDER_AGENT_API_EXPORT
+G_DECLARE_DERIVABLE_TYPE (HwangsaeRecorderAgent, hwangsae_recorder_agent,
+    HWANGSAE, RECORDER_AGENT, HwangsaeulApplication)
+/* *INDENT-ON* */
+    typedef enum
+{
+  RELAY_METHOD_NONE = 0,
+  RELAY_METHOD_START_STREAMING,
+  RELAY_METHOD_STOP_STREAMING
+} RelayMethods;
+
+struct _HwangsaeRecorderAgentClass
+{
+  HwangsaeulApplicationClass parent_class;
+
+  gint64      (* start_recording)                 (HwangsaeRecorderAgent * self,
+                                                   gchar * edge_id);
+
+  void        (* stop_recording)                  (HwangsaeRecorderAgent * self,
+                                                   gchar * edge_id);
+};
+
+gchar         *hwangsae_recorder_agent_get_recording_dir
+                                                 (HwangsaeRecorderAgent * self);
+
+gchar         *hwangsae_recorder_agent_get_recorder_id
+                                                 (HwangsaeRecorderAgent * self);
+
+gchar         *hwangsae_recorder_agent_get_relay_address
+                                                 (HwangsaeRecorderAgent * self);
+
+guint          hwangsae_recorder_agent_get_relay_stream_port
+                                                 (HwangsaeRecorderAgent * self);
+
+void           hwangsae_recorder_agent_send_rest_api
+                                                 (HwangsaeRecorderAgent * self,
+                                                  RelayMethods method, 
+                                                  gchar * edge_id);
+
+G_END_DECLS
+#endif // __HWANGSAE_RECORDER_AGENT_H__

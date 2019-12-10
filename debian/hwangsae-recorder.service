@@ -5,7 +5,7 @@ Description=Stream recorder of Hwansaeul
 Type=simple
 Environment=GSETTINGS_BACKEND=keyfile
 User=hwangsaeul-recorder
-ExecStart=/usr/bin/hwangsae-recorder-agent
+ExecStart=/usr/bin/hwangsae-simple-recorder-agent
 Restart=on-failure
 
 [Install]
