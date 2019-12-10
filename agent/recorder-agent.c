@@ -169,8 +169,9 @@ hwangsae_recorder_agent_start_recording (HwangsaeRecorderAgent * self,
   filename_prefix = g_strdup_printf ("hwangsae-recording-%ld",
       self->recording_id);
 
-  g_object_set (self->recorder, "recording-dir", recording_edge_dir,
-      "filename-prefix", filename_prefix, NULL);
+  hwangsae_recorder_set_recording_dir (self->recorder, recording_edge_dir);
+
+  hwangsae_recorder_set_filename_prefix (self->recorder, filename_prefix);
 
   hwangsae_recorder_start_recording (self->recorder, url);
 
