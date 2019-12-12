@@ -4,6 +4,7 @@ Description=Stream recorder of Hwansaeul
 [Service]
 Type=simple
 Environment=GSETTINGS_BACKEND=keyfile
+User=hwangsaeul-recorder
 ExecStart=/usr/bin/hwangsae-recorder-agent
 Restart=on-failure
 

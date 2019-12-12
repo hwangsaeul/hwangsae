@@ -44,7 +44,8 @@ Description: SRT relay service
 
 Package: hwangsae-recorder
 Architecture: any
-Depends: libhwangsae1 (= ${binary:Version}), ${shlibs:Depends}, ${misc:Depends}
+Depends: adduser, libhwangsae1 (= ${binary:Version}), ${shlibs:Depends},
+  ${misc:Depends}
 Description: SRT recorder service
  Hwangsae Recorder Agent is a stream recording service of Hwangsaeul.
 
