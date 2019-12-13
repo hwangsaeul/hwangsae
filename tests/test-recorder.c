@@ -304,7 +304,7 @@ recording_done_cb (HwangsaeRecorder * recorder, const gchar * file_path,
       GST_TIME_ARGS (duration));
 
   g_assert_cmpint (labs (GST_CLOCK_DIFF (duration, expected_duration)), <=,
-      GST_SECOND);
+      2 * GST_SECOND);
 
   gap = get_gap_duration (file_path);
 
