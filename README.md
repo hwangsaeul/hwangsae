@@ -8,7 +8,10 @@
 There are two modules for handling SRT streaming.
 
 #### Relay
-Hwangsae Relay performs the SRT relay. Edge devices send one SRT streaming to Relay which then can be consumed by N different SRT sinks.
+Hwangsae Relay performs the SRT relay. Edge devices send one SRT stream to Relay which then can be consumed by N different SRT sinks. It uses:
+
+*   [**chamge**](https://github.com/hwangsaeul/chamge): to register to the message broker and receive messages
+*   [**gaeugli**](https://github.com/hwangsaeul/gaeguli): to handle the SRT streaming
 
 #### Recorder
 Hwangsae Recorder allows the system to record streaming from an Edge device via the Hwangsae Relay.
