@@ -16,16 +16,22 @@
  *
  */
 
-#ifndef __HWANGSAE_H__
-#define __HWANGSAE_H__
+#ifndef __HWANGSAE_TRANSMUXER_H__
+#define __HWANGSAE_TRANSMUXER_H__
 
-#define __HWANGSAE_INSIDE__
+#if !defined(__HWANGSAE_INSIDE__) && !defined(HWANGSAE_COMPILATION)
+#error "Only <hwangsae/hwangsae.h> can be included directly."
+#endif
 
-#include <hwangsae/types.h>
-#include <hwangsae/enumtypes.h>
+#include <glib-object.h>
 
-#include <hwangsae/recorder.h>
-#include <hwangsae/relay.h>
-#include <hwangsae/transmuxer.h>
+G_BEGIN_DECLS
 
-#endif // __HWANGSAE_H__
+#define HWANGSAE_TYPE_TRANSMUXER  (hwangsae_transmuxer_get_type ())
+G_DECLARE_FINAL_TYPE              (HwangsaeTransmuxer, hwangsae_transmuxer, HWANGSAE, TRANSMUXER, GObject)
+
+HwangsaeTransmuxer     *hwangsae_transmuxer_new          (void);
+
+G_END_DECLS
+
+#endif // __HWANGSAE_TRANSMUXER_H__

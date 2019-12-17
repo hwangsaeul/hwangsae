@@ -8,12 +8,14 @@ source_h = [
   'hwangsae.h',
   'recorder.h',
   'relay.h',
+  'transmuxer.h',
   'types.h',
 ]
 
 source_c = [
   'recorder.c',
   'relay.c',
+  'transmuxer.c',
   'common.c'
 ]
 
