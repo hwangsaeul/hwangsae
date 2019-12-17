@@ -16,16 +16,34 @@
  *
  */
 
-#ifndef __HWANGSAE_H__
-#define __HWANGSAE_H__
+#include "transmuxer.h"
 
-#define __HWANGSAE_INSIDE__
+struct _HwangsaeTransmuxer
+{
+  GObject parent;
+};
 
-#include <hwangsae/types.h>
-#include <hwangsae/enumtypes.h>
+typedef struct
+{
+  int i;
+} HwangsaeTransmuxerPrivate;
 
-#include <hwangsae/recorder.h>
-#include <hwangsae/relay.h>
-#include <hwangsae/transmuxer.h>
+/* *INDENT-OFF* */
+G_DEFINE_TYPE_WITH_PRIVATE (HwangsaeTransmuxer, hwangsae_transmuxer, G_TYPE_OBJECT)
+/* *INDENT-ON* */
 
-#endif // __HWANGSAE_H__
+HwangsaeTransmuxer *
+hwangsae_transmuxer_new (void)
+{
+  return g_object_new (HWANGSAE_TYPE_TRANSMUXER, NULL);
+}
+
+static void
+hwangsae_transmuxer_init (HwangsaeTransmuxer * self)
+{
+}
+
+static void
+hwangsae_transmuxer_class_init (HwangsaeTransmuxerClass * klass)
+{
+}
