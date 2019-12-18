@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!DOCTYPE book PUBLIC "-//OASIS//DTD DocBook XML V4.5//EN"
+                      "http://www.oasis-open.org/docbook/xml/4.5/docbookx.dtd" [
+<!ENTITY % local.common.attrib "xmlns:xi  CDATA  #FIXED 'http://www.w3.org/2003/XInclude'">
+<!ENTITY version SYSTEM "version.xml">
+]>
+
+<book id="index" xmlns:xi="http://www.w3.org/2003/XInclude">
+    <bookinfo>
+        <title>Hwangsae API reference</title>
+    </bookinfo>
+
+    <chapter id="Broker APIs">
+        <title>Broker APIs</title>
+        <para>This sections shows the available APIs for Hwangsae Broker.</para>
+        <xi:include href="xml/types.xml"/>
+        <xi:include href="xml/relay.xml"/>
+        <xi:include href="xml/recorder.xml"/>
+    </chapter>
+
+    <chapter id="D-Bus related functions">
+        <title>D-Bus related functions</title>
+        <para>This sections shows the available APIs for Hwangsae D-Bus.</para>
+        <xi:include href="xml/edge-interface-generated.xml"/>
+        <xi:include href="xml/recorder-interface-generated.xml"/>
+    </chapter>
+</book>
