@@ -65,6 +65,7 @@ gnome = import('gnome')
 python3 = import('python').find_installation()
 
 hwangsae_incs = include_directories('.', 'hwangsae')
+hwangsae_doc_incs = include_directories('hwangsae')
 
 common_ldflags = [ ]
 
@@ -72,5 +73,6 @@ subdir('hwangsae')
 subdir('agent')
 subdir('tools')
 subdir('tests')
+subdir('doc')
 
 run_command(python3, '-c', 'import shutil; shutil.copy("hooks/pre-commit.hook", ".git/hooks/pre-commit")')
