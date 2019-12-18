@@ -20,3 +20,8 @@
 gchar           *hwangsae_common_get_local_ip  (void);
 
 GSettings       *hwangsae_common_gsettings_new (const gchar * schema_id);
+
+gboolean         hwangsae_common_parse_times_from_filename
+                                               (const gchar *filename,
+                                                guint64     *start_time,
+                                                guint64     *end_time);

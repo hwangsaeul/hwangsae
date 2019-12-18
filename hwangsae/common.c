@@ -22,6 +22,7 @@
 #include <ifaddrs.h>
 #include <net/if.h>
 #include <netdb.h>
+#include <gst/gstclock.h>
 #define G_SETTINGS_ENABLE_BACKEND
 #include <gio/gsettingsbackend.h>
 
@@ -88,4 +89,35 @@ hwangsae_common_gsettings_new (const gchar * schema_id)
   }
 
   return g_settings_new (schema_id);
+}
+
+gboolean
+hwangsae_common_parse_times_from_filename (const gchar * filename,
+    guint64 * start_time, guint64 * end_time)
+{
+  gboolean result = FALSE;
+  gchar **parts = g_strsplit_set (filename, "-.", -1);
+  guint len = g_strv_length (parts);
+
+  if (len < 4) {
+    goto out;
+  }
+
+  /*
+   * /path/to/file/recording-name-starttimeusec-endtimeusec.ts
+   */
+
+  if (start_time) {
+    *start_time = atol (parts[len - 3]) * GST_USECOND;
+  }
+  if (end_time) {
+    *end_time = atol (parts[len - 2]) * GST_USECOND;
+  }
+
+  result = TRUE;
+
+out:
+  g_strfreev (parts);
+
+  return result;
 }
