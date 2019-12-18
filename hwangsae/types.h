@@ -23,6 +23,12 @@
 #define _HWANGSAE_EXTERN        extern
 #endif
 
+/**
+ * SECTION: types
+ * @Title: Hwangsae Types
+ * @Short_description: Several types used to export APIs
+ */
+
 #define HWANGSAE_API_EXPORT     _HWANGSAE_EXTERN
 
 typedef enum {

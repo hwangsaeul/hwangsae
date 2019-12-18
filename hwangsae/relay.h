@@ -25,17 +25,47 @@
 
 #include <glib-object.h>
 
+/**
+ * SECTION: relay
+ * @Title: HwangsaeRelay
+ * @Short_description: Object to handle SRT streaming relay
+ *
+ * A #HwangsaeRelay is object capable of handinling SRT streaming relay, allowing one stream to be shared by N different clients.
+ */
+
 G_BEGIN_DECLS
 
 #define HWANGSAE_TYPE_RELAY     (hwangsae_relay_get_type ())
 G_DECLARE_FINAL_TYPE            (HwangsaeRelay, hwangsae_relay, HWANGSAE, RELAY, GObject)
 
-
+/**
+ * hwangsae_relay_new:
+ *
+ * Creates a new HwangsaeRelay object
+ *
+ * Returns: the newly created object
+ */
 HwangsaeRelay          *hwangsae_relay_new              (void);
 
+/**
+ * hwangsae_relay_get_sink_uri:
+ * @relay: a pointer to a HwangsaeRelay object
+ *
+ * Gets the sink URI
+ *
+ * Returns: the sink URI
+ */
 const gchar            *hwangsae_relay_get_sink_uri     (HwangsaeRelay *relay);
 
-const gchar            *hwangsae_relay_get_source_uri   (HwangsaeRelay *relay);
+/**
+ * hwangsae_relay_get_source_uri:
+ * @relay: a pointer to a HwangsaeRelay object
+ *
+ * Gets the source URI
+ *
+ * Returns: the source URI
+ */
+ const gchar            *hwangsae_relay_get_source_uri   (HwangsaeRelay *relay);
 
 G_END_DECLS
 
