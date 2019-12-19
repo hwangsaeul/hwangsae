@@ -26,6 +26,7 @@
 G_BEGIN_DECLS
 
 GstClockTime          hwangsae_test_get_file_duration (const gchar * file_path);
+GstClockTimeDiff      hwangsae_test_get_gap_duration  (const gchar * file_path);
 
 G_END_DECLS
 
