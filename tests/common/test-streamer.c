@@ -33,6 +33,7 @@ struct _HwangsaeTestStreamer
 
   GaeguliFifoTransmit *transmit;
   GaeguliPipeline *pipeline;
+  guint target_id;
 
   gboolean should_stream;
   GThread *streaming_thread;
@@ -76,6 +77,13 @@ hwangsae_test_streamer_thread_func (HwangsaeTestStreamer * self)
       &error);
   g_assert_no_error (error);
 
+  if (!self->target_id) {
+    self->target_id = gaeguli_pipeline_add_fifo_target_full (self->pipeline,
+        GAEGULI_VIDEO_CODEC_H264, self->resolution, 30, 2048000,
+        gaeguli_fifo_transmit_get_fifo (self->transmit), &error);
+    g_assert_no_error (error);
+  }
+
   while (self->should_stream) {
     g_main_context_iteration (context, TRUE);
   }
@@ -96,14 +104,7 @@ hwangsae_test_streamer_set_uri (HwangsaeTestStreamer * self, const gchar * uri)
 void
 hwangsae_test_streamer_start (HwangsaeTestStreamer * self)
 {
-  g_autoptr (GError) error = NULL;
-
   g_assert_null (self->streaming_thread);
-
-  gaeguli_pipeline_add_fifo_target_full (self->pipeline,
-      GAEGULI_VIDEO_CODEC_H264, self->resolution, 30, 2048000,
-      gaeguli_fifo_transmit_get_fifo (self->transmit), &error);
-  g_assert_no_error (error);
 
   self->should_stream = TRUE;
   self->streaming_thread = g_thread_new ("streaming_thread_func",
@@ -121,6 +122,7 @@ void
 hwangsae_test_streamer_stop (HwangsaeTestStreamer * self)
 {
   gaeguli_pipeline_stop (self->pipeline);
+  self->target_id = 0;
   hwangsae_test_streamer_pause (self);
 }
 
