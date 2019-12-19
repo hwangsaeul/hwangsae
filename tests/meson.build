@@ -29,7 +29,6 @@ foreach t: tests
 
   test(
     t, exe,
-    args: [ '--tap', '-k' ],
     env: env,
     timeout: 120,
     is_parallel: false
