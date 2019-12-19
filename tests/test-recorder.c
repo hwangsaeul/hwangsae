@@ -21,9 +21,9 @@
 #include <gaeguli/gaeguli.h>
 #include <gio/gio.h>
 #include <glib/gstdio.h>
-#include <gst/pbutils/pbutils.h>
 
 #include "hwangsae/hwangsae.h"
+#include "common/test.h"
 #include "common/test-streamer.h"
 
 typedef struct
@@ -55,51 +55,6 @@ fixture_teardown (TestFixture * fixture, gconstpointer unused)
   g_clear_object (&fixture->streamer);
   g_clear_object (&fixture->recorder);
   g_clear_pointer (&fixture->loop, g_main_loop_unref);
-}
-
-static GstClockTime
-get_file_duration (const gchar * file_path)
-{
-  g_autoptr (GstDiscoverer) discoverer = NULL;
-  g_autoptr (GError) error = NULL;
-  g_autoptr (GstDiscovererInfo) info = NULL;
-  g_autoptr (GstDiscovererStreamInfo) stream_info = NULL;
-  g_autoptr (GstCaps) stream_caps = NULL;
-  g_autofree gchar *stream_caps_str = NULL;
-  g_autofree gchar *uri = NULL;
-  const gchar *container_type;
-
-  discoverer = gst_discoverer_new (5 * GST_SECOND, &error);
-  g_assert_no_error (error);
-
-  uri = g_strdup_printf ("file://%s", file_path);
-
-  info = gst_discoverer_discover_uri (discoverer, uri, &error);
-  g_assert_no_error (error);
-  g_assert_cmpint (gst_discoverer_info_get_result (info), ==,
-      GST_DISCOVERER_OK);
-
-  stream_info = gst_discoverer_info_get_stream_info (info);
-  stream_caps = gst_discoverer_stream_info_get_caps (stream_info);
-
-  stream_caps_str = gst_caps_to_string (stream_caps);
-  g_debug ("Container file has caps: %s", stream_caps_str);
-
-  g_assert_cmpint (gst_caps_get_size (stream_caps), ==, 1);
-
-  if (g_str_has_suffix (file_path, ".mp4")) {
-    container_type = "video/quicktime";
-  } else if (g_str_has_suffix (file_path, ".ts")) {
-    container_type = "video/mpegts";
-  } else {
-    g_assert_not_reached ();
-  }
-
-  g_assert_cmpstr
-      (gst_structure_get_name (gst_caps_get_structure (stream_caps, 0)), ==,
-      container_type);
-
-  return gst_discoverer_info_get_duration (info);
 }
 
 // recorder-record -------------------------------------------------------------
@@ -139,7 +94,7 @@ static void
 file_completed_cb (HwangsaeRecorder * recorder, const gchar * file_path,
     RecorderTestData * data)
 {
-  GstClockTime duration = get_file_duration (file_path);
+  GstClockTime duration = hwangsae_test_get_file_duration (file_path);
 
   g_debug ("Finished recording %s, duration %" GST_TIME_FORMAT, file_path,
       GST_TIME_ARGS (duration));
@@ -298,7 +253,7 @@ recording_done_cb (HwangsaeRecorder * recorder, const gchar * file_path,
 
   hwangsae_test_streamer_stop (fixture->streamer);
 
-  duration = get_file_duration (file_path);
+  duration = hwangsae_test_get_file_duration (file_path);
 
   g_debug ("Finished recording %s, duration %" GST_TIME_FORMAT, file_path,
       GST_TIME_ARGS (duration));
@@ -439,7 +394,7 @@ test_recorder_split_time (TestFixture * fixture, gconstpointer unused)
 
   for (; filenames; filenames = g_slist_delete_link (filenames, filenames)) {
     g_autofree gchar *filename = filenames->data;
-    GstClockTime duration = get_file_duration (filename);
+    GstClockTime duration = hwangsae_test_get_file_duration (filename);
 
     g_debug ("%s has duration %" GST_TIME_FORMAT, filename,
         GST_TIME_ARGS (duration));
