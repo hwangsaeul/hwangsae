@@ -32,6 +32,11 @@ G_DECLARE_FINAL_TYPE              (HwangsaeTransmuxer, hwangsae_transmuxer, HWAN
 
 HwangsaeTransmuxer     *hwangsae_transmuxer_new          (void);
 
+void                    hwangsae_transmuxer_merge        (HwangsaeTransmuxer  *transmuxer,
+                                                          GSList              *input_files,
+                                                          const gchar         *output,
+                                                          GError             **error);
+
 G_END_DECLS
 
 #endif // __HWANGSAE_TRANSMUXER_H__
