@@ -5,6 +5,7 @@ subdir('common')
 tests = [
   'test-recorder',
   'test-relay',
+  'test-transmuxer',
 ]
 
 env = environment()
