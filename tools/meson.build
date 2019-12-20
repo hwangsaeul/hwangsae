@@ -1,5 +1,6 @@
 tools = [
-  'recorder'
+  'recorder',
+  'transmuxer',
 ]
 
 tools_c_args = [
