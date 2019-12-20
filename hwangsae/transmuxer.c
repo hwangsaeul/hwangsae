@@ -34,7 +34,7 @@ typedef struct
   GstElement *pipeline;
   GstElement *concat;
 
-  GSList *segments;
+  GList *segments;
   guint current_segment;
 
   gboolean have_eos;
@@ -111,7 +111,7 @@ _src_probe (GstPad * pad, GstPadProbeInfo * info, gpointer user_data)
 
     gst_event_copy_segment (event, segment);
 
-    s = g_slist_nth_data (priv->segments, priv->current_segment++);
+    s = g_list_nth_data (priv->segments, priv->current_segment++);
 
     segment->base = s->base_time;
 
@@ -161,11 +161,11 @@ _pad_added (GstElement * element, GstPad * pad, gpointer user_data)
       hwangsae_transmuxer_get_instance_private (user_data);
 
   Segment *segment;
-  GSList *item;
+  GList *item;
 
   g_mutex_lock (&priv->lock);
 
-  item = g_slist_find_custom (priv->segments, element,
+  item = g_list_find_custom (priv->segments, element,
       _find_segment_by_parsebin);
   segment = item->data;
 
@@ -190,7 +190,7 @@ hwangsae_transmuxer_clear (HwangsaeTransmuxer * self)
     gst_element_set_state (priv->pipeline, GST_STATE_NULL);
   }
 
-  g_slist_free_full (priv->segments, (GDestroyNotify) _free_segment);
+  g_list_free_full (priv->segments, (GDestroyNotify) _free_segment);
   priv->segments = NULL;
   priv->current_segment = 0;
   priv->have_eos = FALSE;
@@ -253,10 +253,10 @@ hwangsae_transmuxer_merge (HwangsaeTransmuxer * self, GSList * input_files,
     segment->filename = g_strdup (file);
     segment->base_time = segment_start - recording_start;
 
-    priv->segments = g_slist_append (priv->segments, segment);
+    priv->segments = g_list_append (priv->segments, segment);
   }
 
-  hwangsae_transmuxer_link_segment (self, g_slist_nth_data (priv->segments, 0));
+  hwangsae_transmuxer_link_segment (self, g_list_nth_data (priv->segments, 0));
 
   gst_element_set_state (priv->pipeline, GST_STATE_PAUSED);
 
