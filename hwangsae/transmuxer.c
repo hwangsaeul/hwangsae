@@ -198,6 +198,40 @@ hwangsae_transmuxer_clear (HwangsaeTransmuxer * self)
   gst_clear_object (&priv->pipeline);
 }
 
+static void
+hwangsae_transmuxer_parse_segments (HwangsaeTransmuxer * self,
+    GSList * input_files)
+{
+  HwangsaeTransmuxerPrivate *priv =
+      hwangsae_transmuxer_get_instance_private (self);
+
+  GList *segments = NULL;
+  guint64 recording_start = GST_CLOCK_TIME_NONE;
+
+  for (; input_files; input_files = input_files->next) {
+    gchar *file = input_files->data;
+    Segment *segment;
+    guint64 segment_start;
+
+    if (!hwangsae_common_parse_times_from_filename (file, &segment_start, NULL)) {
+      g_warning ("Invalid filename %s", file);
+      continue;
+    }
+
+    if (!GST_CLOCK_TIME_IS_VALID (recording_start)) {
+      recording_start = segment_start;
+    }
+
+    segment = g_new0 (Segment, 1);
+    segment->filename = g_strdup (file);
+    segment->base_time = segment_start - recording_start;
+
+    segments = g_list_append (segments, segment);
+  }
+
+  priv->segments = segments;
+}
+
 void
 hwangsae_transmuxer_merge (HwangsaeTransmuxer * self, GSList * input_files,
     const gchar * output, GError ** error)
@@ -209,7 +243,6 @@ hwangsae_transmuxer_merge (HwangsaeTransmuxer * self, GSList * input_files,
   g_autoptr (GstPad) pad = NULL;
   g_autoptr (GstBus) bus = NULL;
   g_autoptr (GError) parse_error = NULL;
-  guint64 recording_start = GST_CLOCK_TIME_NONE;
 
   g_return_if_fail (input_files != NULL);
   g_return_if_fail (output != NULL);
@@ -235,26 +268,7 @@ hwangsae_transmuxer_merge (HwangsaeTransmuxer * self, GSList * input_files,
   gst_pad_add_probe (pad, GST_PAD_PROBE_TYPE_EVENT_DOWNSTREAM, _src_probe, self,
       NULL);
 
-  for (; input_files; input_files = input_files->next) {
-    gchar *file = input_files->data;
-    Segment *segment;
-    guint64 segment_start;
-
-    if (!hwangsae_common_parse_times_from_filename (file, &segment_start, NULL)) {
-      g_warning ("Invalid filename %s", file);
-      continue;
-    }
-
-    if (!GST_CLOCK_TIME_IS_VALID (recording_start)) {
-      recording_start = segment_start;
-    }
-
-    segment = g_new0 (Segment, 1);
-    segment->filename = g_strdup (file);
-    segment->base_time = segment_start - recording_start;
-
-    priv->segments = g_list_append (priv->segments, segment);
-  }
+  hwangsae_transmuxer_parse_segments (self, input_files);
 
   hwangsae_transmuxer_link_segment (self, g_list_nth_data (priv->segments, 0));
 
