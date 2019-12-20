@@ -58,6 +58,14 @@ _free_segment (Segment * segment)
   g_free (segment);
 }
 
+static gint
+_compare_segments (gconstpointer a, gconstpointer b)
+{
+  gint64 diff = ((Segment *) a)->base_time - ((Segment *) b)->base_time;
+
+  return (diff < 0) ? -1 : ((diff > 0) ? 1 : 0);
+}
+
 HwangsaeTransmuxer *
 hwangsae_transmuxer_new (void)
 {
@@ -206,7 +214,7 @@ hwangsae_transmuxer_parse_segments (HwangsaeTransmuxer * self,
       hwangsae_transmuxer_get_instance_private (self);
 
   GList *segments = NULL;
-  guint64 recording_start = GST_CLOCK_TIME_NONE;
+  GList *it;
 
   for (; input_files; input_files = input_files->next) {
     gchar *file = input_files->data;
@@ -218,15 +226,17 @@ hwangsae_transmuxer_parse_segments (HwangsaeTransmuxer * self,
       continue;
     }
 
-    if (!GST_CLOCK_TIME_IS_VALID (recording_start)) {
-      recording_start = segment_start;
-    }
-
     segment = g_new0 (Segment, 1);
     segment->filename = g_strdup (file);
-    segment->base_time = segment_start - recording_start;
+    segment->base_time = segment_start;
 
-    segments = g_list_append (segments, segment);
+    segments = g_list_insert_sorted (segments, segment, _compare_segments);
+  }
+
+  /* Make base times start from zero. */
+  for (it = g_list_last (segments); it; it = it->prev) {
+    ((Segment *) it->data)->base_time -=
+        ((Segment *) segments->data)->base_time;
   }
 
   priv->segments = segments;
