@@ -38,6 +38,9 @@ typedef struct
   guint current_segment;
   guint current_segment_link;
 
+  guint64 max_size_time;
+  guint64 max_size_bytes;
+
   gboolean have_eos;
 } HwangsaeTransmuxerPrivate;
 
@@ -51,6 +54,13 @@ typedef struct
   GstElement *parsebin;
   gchar *filename;
 } Segment;
+
+enum
+{
+  PROP_MAX_SIZE_TIME = 1,
+  PROP_MAX_SIZE_BYTES,
+  PROP_LAST
+};
 
 static void
 _free_segment (Segment * segment)
@@ -88,6 +98,40 @@ hwangsae_transmuxer_init (HwangsaeTransmuxer * self)
 
   g_mutex_init (&priv->lock);
 }
+
+void
+hwangsae_transmuxer_set_max_size_time (HwangsaeTransmuxer * self,
+    guint64 duration_ns)
+{
+  g_object_set (self, "max-size-time", duration_ns, NULL);
+}
+
+guint64
+hwangsae_transmuxer_get_max_size_time (HwangsaeTransmuxer * self)
+{
+  guint64 result;
+
+  g_object_get (self, "max-size-time", &result, NULL);
+
+  return result;
+}
+
+void
+hwangsae_transmuxer_set_max_size_bytes (HwangsaeTransmuxer * self, guint64 size)
+{
+  g_object_set (self, "max-size-bytes", size, NULL);
+}
+
+guint64
+hwangsae_transmuxer_get_max_size_bytes (HwangsaeTransmuxer * self)
+{
+  guint64 result;
+
+  g_object_get (self, "max-size-bytes", &result, NULL);
+
+  return result;
+}
+
 
 static gint _find_segment_by_parsebin (gconstpointer a, gconstpointer b);
 static void hwangsae_transmuxer_link_segment (HwangsaeTransmuxer * self,
@@ -287,12 +331,12 @@ hwangsae_transmuxer_merge (HwangsaeTransmuxer * self, GSList * input_files,
   g_autoptr (GstBus) bus = NULL;
   g_autoptr (GError) parse_error = NULL;
 
-
   g_return_if_fail (input_files != NULL);
   g_return_if_fail (output != NULL);
 
-  priv->pipeline = gst_parse_launch ("concat name=concat ! h264parse ! mp4mux "
-      "! filesink name=sink", &parse_error);
+  priv->pipeline = gst_parse_launch ("concat name=concat ! h264parse ! "
+      "splitmuxsink name=sink async-finalize=true muxer-factory=mp4mux",
+      &parse_error);
 
   if (parse_error) {
     g_propagate_error (error, parse_error);
@@ -307,6 +351,10 @@ hwangsae_transmuxer_merge (HwangsaeTransmuxer * self, GSList * input_files,
 
   g_object_set (priv->concat, "adjust-base", FALSE, NULL);
   g_object_set (sink, "location", output, NULL);
+  if (priv->max_size_time || priv->max_size_bytes) {
+    g_object_set (sink, "max-size-time", priv->max_size_time,
+        "max-size-bytes", priv->max_size_bytes, NULL);
+  }
 
   pad = gst_element_get_static_pad (priv->concat, "src");
   gst_pad_add_probe (pad, GST_PAD_PROBE_TYPE_EVENT_DOWNSTREAM, _src_probe, self,
@@ -327,6 +375,44 @@ hwangsae_transmuxer_merge (HwangsaeTransmuxer * self, GSList * input_files,
 }
 
 static void
+hwangsae_transmuxer_set_property (GObject * object, guint property_id,
+    const GValue * value, GParamSpec * pspec)
+{
+  HwangsaeTransmuxerPrivate *priv =
+      hwangsae_transmuxer_get_instance_private (HWANGSAE_TRANSMUXER (object));
+
+  switch (property_id) {
+    case PROP_MAX_SIZE_TIME:
+      priv->max_size_time = g_value_get_uint64 (value);
+      break;
+    case PROP_MAX_SIZE_BYTES:
+      priv->max_size_bytes = g_value_get_uint64 (value);
+      break;
+    default:
+      G_OBJECT_WARN_INVALID_PROPERTY_ID (object, property_id, pspec);
+  }
+}
+
+static void
+hwangsae_transmuxer_get_property (GObject * object, guint property_id,
+    GValue * value, GParamSpec * pspec)
+{
+  HwangsaeTransmuxerPrivate *priv =
+      hwangsae_transmuxer_get_instance_private (HWANGSAE_TRANSMUXER (object));
+
+  switch (property_id) {
+    case PROP_MAX_SIZE_TIME:
+      g_value_set_uint64 (value, priv->max_size_time);
+      break;
+    case PROP_MAX_SIZE_BYTES:
+      g_value_set_uint64 (value, priv->max_size_bytes);
+      break;
+    default:
+      G_OBJECT_WARN_INVALID_PROPERTY_ID (object, property_id, pspec);
+  }
+}
+
+static void
 hwangsae_transmuxer_finalize (GObject * object)
 {
   HwangsaeTransmuxerPrivate *priv =
@@ -342,5 +428,18 @@ hwangsae_transmuxer_class_init (HwangsaeTransmuxerClass * klass)
 {
   GObjectClass *gobject_class = (GObjectClass *) klass;
 
+  gobject_class->set_property = hwangsae_transmuxer_set_property;
+  gobject_class->get_property = hwangsae_transmuxer_get_property;
+
   gobject_class->finalize = hwangsae_transmuxer_finalize;
+
+  g_object_class_install_property (gobject_class, PROP_MAX_SIZE_TIME,
+      g_param_spec_uint64 ("max-size-time", "Max recording file duration",
+          "Max amount of time per file (in ns, 0 = disable)",
+          0, G_MAXUINT64, 0, G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS));
+
+  g_object_class_install_property (gobject_class, PROP_MAX_SIZE_BYTES,
+      g_param_spec_uint64 ("max-size-bytes", "Max recording file size in bytes",
+          "Max amount of bytes per file (0 = disable)",
+          0, G_MAXUINT64, 0, G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS));
 }
