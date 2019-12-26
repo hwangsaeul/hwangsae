@@ -19,6 +19,8 @@
 #ifndef __HWANGSAE_TYPES_H__
 #define __HWANGSAE_TYPES_H__
 
+#include <gmodule.h>
+
 #ifndef _HWANGSAE_EXTERN
 #define _HWANGSAE_EXTERN        extern
 #endif
@@ -40,5 +42,12 @@ typedef enum {
   HWANGSAE_CONTAINER_MP4,
   HWANGSAE_CONTAINER_TS,
 } HwangsaeContainer;
+
+#define HWANGSAE_TRANSMUXER_ERROR      (hwangsae_transmuxer_error_quark())
+GQuark hwangsae_transmuxer_error_quark (void);
+
+typedef enum {
+  HWANGSAE_TRANSMUXER_ERROR_OVERLAP = 1,
+} HwangsaeTransmuxerError;
 
 #endif // __HWANGSAE_TYPES_H__
