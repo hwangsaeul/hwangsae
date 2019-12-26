@@ -242,6 +242,41 @@ test_split_bytes (void)
   test_split_time_bytes (0, 1 * 1024 * 1024);
 }
 
+static void
+test_overlap (void)
+{
+  g_autoptr (HwangsaeTransmuxer) transmuxer = NULL;
+  g_autoptr (GError) error = NULL;
+  g_autofree gchar *output_file = NULL;
+  GSList *input_files = NULL;
+
+  input_files = g_slist_append (input_files,
+      g_test_build_filename (G_TEST_DIST, "data/test-0-5000000.ts", NULL));
+
+  input_files = g_slist_append (input_files,
+      g_test_build_filename (G_TEST_DIST, "data/test-5000000-11000000.ts",
+          NULL));
+
+  input_files = g_slist_append (input_files,
+      g_test_build_filename (G_TEST_DIST, "data/test-10000000-15000000.ts",
+          NULL));
+
+  transmuxer = hwangsae_transmuxer_new ();
+
+  output_file =
+      g_build_filename (g_get_tmp_dir (), "transmuxer-test-XXXXXX.mp4", NULL);
+  g_close (g_mkstemp (output_file), NULL);
+
+  hwangsae_transmuxer_merge (transmuxer, input_files, output_file, &error);
+
+  g_assert_true (g_error_matches (error, HWANGSAE_TRANSMUXER_ERROR,
+          HWANGSAE_TRANSMUXER_ERROR_OVERLAP));
+
+  g_slist_free_full (input_files, g_free);
+
+  g_unlink (output_file);
+}
+
 int
 main (int argc, char *argv[])
 {
@@ -258,6 +293,7 @@ main (int argc, char *argv[])
 
   g_test_add_func ("/hwangsae/transmuxer-split_bytes", test_split_bytes);
 
+  g_test_add_func ("/hwangsae/transmuxer-overlap", test_overlap);
 
   return g_test_run ();
 }
