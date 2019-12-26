@@ -20,6 +20,8 @@
 
 #include "common.h"
 
+#include "types.h"
+
 #include <gst/gst.h>
 
 struct _HwangsaeTransmuxer
@@ -45,11 +47,14 @@ typedef struct
 
 /* *INDENT-OFF* */
 G_DEFINE_TYPE_WITH_PRIVATE (HwangsaeTransmuxer, hwangsae_transmuxer, G_TYPE_OBJECT)
+
+G_DEFINE_QUARK (hwangsae-transmuxer-error-quark, hwangsae_transmuxer_error)
 /* *INDENT-ON* */
 
 typedef struct
 {
   guint64 base_time;
+  guint64 end_time;
   GstElement *parsebin;
   gchar *filename;
 } Segment;
@@ -308,9 +313,10 @@ hwangsae_transmuxer_parse_segments (HwangsaeTransmuxer * self,
   for (; input_files; input_files = input_files->next) {
     gchar *file = input_files->data;
     Segment *segment;
-    guint64 segment_start;
+    guint64 segment_start, segment_end;
 
-    if (!hwangsae_common_parse_times_from_filename (file, &segment_start, NULL)) {
+    if (!hwangsae_common_parse_times_from_filename (file, &segment_start,
+            &segment_end)) {
       g_warning ("Invalid filename %s", file);
       continue;
     }
@@ -318,6 +324,7 @@ hwangsae_transmuxer_parse_segments (HwangsaeTransmuxer * self,
     segment = g_new0 (Segment, 1);
     segment->filename = g_strdup (file);
     segment->base_time = segment_start;
+    segment->end_time = segment_end;
 
     segments = g_list_insert_sorted (segments, segment, _compare_segments);
   }
@@ -326,9 +333,32 @@ hwangsae_transmuxer_parse_segments (HwangsaeTransmuxer * self,
   for (it = g_list_last (segments); it; it = it->prev) {
     ((Segment *) it->data)->base_time -=
         ((Segment *) segments->data)->base_time;
+    ((Segment *) it->data)->end_time -= ((Segment *) segments->data)->base_time;
   }
 
   priv->segments = segments;
+}
+
+static gboolean
+_check_overlap (HwangsaeTransmuxer * self)
+{
+  HwangsaeTransmuxerPrivate *priv =
+      hwangsae_transmuxer_get_instance_private (self);
+  GList *it;
+
+  if (!priv->segments) {
+    /* Empty segment list. */
+    return TRUE;
+  }
+
+  for (it = priv->segments->next; it; it = it->next) {
+    Segment *segment = it->data;
+    Segment *previous_segment = it->prev->data;
+
+    if (previous_segment->end_time > segment->base_time)
+      return FALSE;
+  }
+  return TRUE;
 }
 
 void
@@ -345,6 +375,15 @@ hwangsae_transmuxer_merge (HwangsaeTransmuxer * self, GSList * input_files,
 
   g_return_if_fail (input_files != NULL);
   g_return_if_fail (output != NULL);
+
+  hwangsae_transmuxer_parse_segments (self, input_files);
+
+  if (!_check_overlap (self)) {
+    g_warning ("There are overlapping segments");
+    g_set_error (error, HWANGSAE_TRANSMUXER_ERROR,
+        HWANGSAE_TRANSMUXER_ERROR_OVERLAP, "Overlapping segments");
+    return;
+  }
 
   priv->pipeline = gst_parse_launch ("concat name=concat ! h264parse ! "
       "splitmuxsink name=sink async-finalize=true muxer-factory=mp4mux",
@@ -371,8 +410,6 @@ hwangsae_transmuxer_merge (HwangsaeTransmuxer * self, GSList * input_files,
   pad = gst_element_get_static_pad (priv->concat, "src");
   gst_pad_add_probe (pad, GST_PAD_PROBE_TYPE_EVENT_DOWNSTREAM, _src_probe, self,
       NULL);
-
-  hwangsae_transmuxer_parse_segments (self, input_files);
 
   hwangsae_transmuxer_link_segment (self, g_list_nth_data (priv->segments,
           priv->current_segment_link++));
