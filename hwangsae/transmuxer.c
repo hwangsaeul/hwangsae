@@ -36,6 +36,7 @@ typedef struct
 
   GList *segments;
   guint current_segment;
+  guint current_segment_link;
 
   gboolean have_eos;
 } HwangsaeTransmuxerPrivate;
@@ -88,16 +89,45 @@ hwangsae_transmuxer_init (HwangsaeTransmuxer * self)
   g_mutex_init (&priv->lock);
 }
 
+static gint _find_segment_by_parsebin (gconstpointer a, gconstpointer b);
+static void hwangsae_transmuxer_link_segment (HwangsaeTransmuxer * self,
+    Segment * segment);
+
 static gboolean
 _bus_watch (GstBus * bus, GstMessage * message, gpointer user_data)
 {
+  HwangsaeTransmuxer *self = user_data;
   HwangsaeTransmuxerPrivate *priv =
-      hwangsae_transmuxer_get_instance_private (user_data);
+      hwangsae_transmuxer_get_instance_private (self);
 
   switch (GST_MESSAGE_TYPE (message)) {
     case GST_MESSAGE_EOS:
       priv->have_eos = TRUE;
       break;
+    case GST_MESSAGE_ERROR:{
+      g_autoptr (GError) err = NULL;
+      g_autofree gchar *dbg_info = NULL;
+
+      gst_message_parse_error (message, &err, &dbg_info);
+      g_warning ("Domain: %s, code: %d, message: %s",
+          g_quark_to_string (err->domain), err->code, err->message);
+
+      if (err->domain == GST_STREAM_ERROR
+          && err->code == GST_STREAM_ERROR_FAILED) {
+        Segment *segment;
+
+        g_warning ("Stream error, omitting current segment");
+
+        segment =
+            g_list_nth_data (priv->segments, priv->current_segment_link++);
+
+        if (segment) {
+          hwangsae_transmuxer_link_segment (self, segment);
+        } else {
+          gst_element_set_state (priv->pipeline, GST_STATE_PLAYING);
+        }
+      }
+    }
     default:
       break;
   }
@@ -179,6 +209,8 @@ _pad_added (GstElement * element, GstPad * pad, gpointer user_data)
 
   gst_element_link (segment->parsebin, priv->concat);
 
+  priv->current_segment_link++;
+
   if (item->next) {
     hwangsae_transmuxer_link_segment (self, (Segment *) item->next->data);
   } else {
@@ -201,6 +233,7 @@ hwangsae_transmuxer_clear (HwangsaeTransmuxer * self)
   g_list_free_full (priv->segments, (GDestroyNotify) _free_segment);
   priv->segments = NULL;
   priv->current_segment = 0;
+  priv->current_segment_link = 0;
   priv->have_eos = FALSE;
   gst_clear_object (&priv->concat);
   gst_clear_object (&priv->pipeline);
@@ -254,6 +287,7 @@ hwangsae_transmuxer_merge (HwangsaeTransmuxer * self, GSList * input_files,
   g_autoptr (GstBus) bus = NULL;
   g_autoptr (GError) parse_error = NULL;
 
+
   g_return_if_fail (input_files != NULL);
   g_return_if_fail (output != NULL);
 
@@ -280,7 +314,8 @@ hwangsae_transmuxer_merge (HwangsaeTransmuxer * self, GSList * input_files,
 
   hwangsae_transmuxer_parse_segments (self, input_files);
 
-  hwangsae_transmuxer_link_segment (self, g_list_nth_data (priv->segments, 0));
+  hwangsae_transmuxer_link_segment (self, g_list_nth_data (priv->segments,
+          priv->current_segment_link++));
 
   gst_element_set_state (priv->pipeline, GST_STATE_PAUSED);
 
