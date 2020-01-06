@@ -127,6 +127,7 @@ _bus_watch (GstBus * bus, GstMessage * message, gpointer user_data)
           gst_element_set_state (priv->pipeline, GST_STATE_PLAYING);
         }
       }
+      break;
     }
     default:
       break;
