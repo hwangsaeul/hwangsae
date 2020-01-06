@@ -77,7 +77,7 @@ test_corrupted (void)
 
   input_files = g_slist_append (input_files,
       g_test_build_filename (G_TEST_DIST,
-          "data/test-5000000-10000000-corrupted.ts", NULL));
+          "data/test-corrupted-5000000-10000000.ts", NULL));
 
   input_files =
       g_slist_append (input_files, g_test_build_filename (G_TEST_DIST,
