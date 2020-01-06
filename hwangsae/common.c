@@ -97,7 +97,10 @@ hwangsae_common_parse_times_from_filename (const gchar * filename,
 {
   gboolean result = FALSE;
   gchar **parts = g_strsplit_set (filename, "-.", -1);
+  gchar *endptr;
   guint len = g_strv_length (parts);
+  guint64 start;
+  guint64 end;
 
   if (len < 4) {
     goto out;
@@ -107,11 +110,21 @@ hwangsae_common_parse_times_from_filename (const gchar * filename,
    * /path/to/file/recording-name-starttimeusec-endtimeusec.ts
    */
 
+  start = g_ascii_strtoull (parts[len - 3], &endptr, 10) * GST_USECOND;
+  if (*endptr != '\0') {
+    goto out;
+  }
+
+  end = g_ascii_strtoull (parts[len - 2], &endptr, 10) * GST_USECOND;
+  if (*endptr != '\0') {
+    goto out;
+  }
+
   if (start_time) {
-    *start_time = atol (parts[len - 3]) * GST_USECOND;
+    *start_time = start;
   }
   if (end_time) {
-    *end_time = atol (parts[len - 2]) * GST_USECOND;
+    *end_time = end;
   }
 
   result = TRUE;
