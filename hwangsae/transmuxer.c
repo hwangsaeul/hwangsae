@@ -35,7 +35,6 @@ typedef struct
   GstElement *concat;
 
   GList *segments;
-  guint current_segment;
   guint current_segment_link;
 
   gboolean have_eos;
@@ -145,19 +144,32 @@ _src_probe (GstPad * pad, GstPadProbeInfo * info, gpointer user_data)
   GstEvent *event = GST_PAD_PROBE_INFO_EVENT (info);
 
   if (GST_EVENT_TYPE (event) == GST_EVENT_SEGMENT) {
-    Segment *s;
-    GstSegment *segment = gst_segment_new ();
+    g_autoptr (GstPad) active_pad = NULL;
+    GList *item;
+    GstSegment *segment;
 
+    g_object_get (GST_PAD_PARENT (pad), "active-pad", &active_pad, NULL);
+
+    item = g_list_find_custom (priv->segments,
+        GST_PAD_PARENT (GST_PAD_PEER (active_pad)), _find_segment_by_parsebin);
+
+    if (!item) {
+      g_warning ("No segment for active pad %s!", GST_PAD_NAME (active_pad));
+      goto out;
+    }
+
+    segment = gst_segment_new ();
     gst_event_copy_segment (event, segment);
+    segment->base = ((Segment *) item->data)->base_time;
 
-    s = g_list_nth_data (priv->segments, priv->current_segment++);
-
-    segment->base = s->base_time;
+    g_debug ("New segment with base %" GST_TIME_FORMAT,
+        GST_TIME_ARGS (segment->base));
 
     gst_event_unref (event);
     GST_PAD_PROBE_INFO_DATA (info) = gst_event_new_segment (segment);
   }
 
+out:
   return GST_PAD_PROBE_OK;
 }
 
@@ -233,7 +245,6 @@ hwangsae_transmuxer_clear (HwangsaeTransmuxer * self)
 
   g_list_free_full (priv->segments, (GDestroyNotify) _free_segment);
   priv->segments = NULL;
-  priv->current_segment = 0;
   priv->current_segment_link = 0;
   priv->have_eos = FALSE;
   gst_clear_object (&priv->concat);
