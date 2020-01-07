@@ -71,6 +71,7 @@ test_corrupted (void)
   g_autoptr (GError) error = NULL;
   g_autofree gchar *output_file = NULL;
   GSList *input_files = NULL;
+  GstClockTimeDiff gap;
 
   input_files = g_slist_append (input_files,
       g_test_build_filename (G_TEST_DIST, "data/test-0-5000000.ts", NULL));
@@ -96,6 +97,11 @@ test_corrupted (void)
   /* Total file duration should be 15 seconds. */
   g_assert_cmpuint (hwangsae_test_get_file_duration (output_file), ==,
       15 * GST_SECOND);
+
+  /* Gap should last 5 seconds ±20ms. */
+  gap = hwangsae_test_get_gap_duration (output_file);
+  g_assert_cmpint (labs (GST_CLOCK_DIFF (gap, 5 * GST_SECOND)), <=,
+      20 * GST_MSECOND);
 
   g_slist_free_full (input_files, g_free);
 
