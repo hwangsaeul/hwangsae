@@ -42,6 +42,7 @@ typedef struct
 
   guint64 max_size_time;
   guint64 max_size_bytes;
+  gboolean have_split_at_running_time;
 
   gboolean have_eos;
 } HwangsaeTransmuxerPrivate;
@@ -302,6 +303,7 @@ hwangsae_transmuxer_clear (HwangsaeTransmuxer * self)
   priv->segments = NULL;
   priv->current_segment_link = NULL;
   priv->have_eos = FALSE;
+  priv->have_split_at_running_time = FALSE;
   gst_clear_object (&priv->concat);
   gst_clear_object (&priv->pipeline);
 }
@@ -377,6 +379,7 @@ hwangsae_transmuxer_merge (HwangsaeTransmuxer * self, GSList * input_files,
   g_autoptr (GstPad) pad = NULL;
   g_autoptr (GstBus) bus = NULL;
   g_autoptr (GError) parse_error = NULL;
+  g_autofree gchar *output_tmp = NULL;
   GstElement *parse = NULL;
 
   g_return_if_fail (input_files != NULL);
@@ -404,7 +407,15 @@ hwangsae_transmuxer_merge (HwangsaeTransmuxer * self, GSList * input_files,
   gst_bus_add_watch (bus, _bus_watch, self);
 
   g_object_set (priv->concat, "adjust-base", FALSE, NULL);
+
+  if ((priv->max_size_time != 0 || priv->max_size_bytes != 0 ||
+          priv->have_split_at_running_time) && (strstr (output, "%") == NULL)) {
+    /* Output filename is not a pattern, add fragment number as a suffix. */
+    output_tmp = g_strconcat (output, ".%05d", NULL);
+    output = output_tmp;
+  }
   g_object_set (priv->splitmux, "location", output, NULL);
+
   g_object_set (priv->splitmux, "max-size-time", priv->max_size_time,
       "max-size-bytes", priv->max_size_bytes, NULL);
 
@@ -431,6 +442,7 @@ hwangsae_transmuxer_split_at_running_time (HwangsaeTransmuxer * self,
       hwangsae_transmuxer_get_instance_private (self);
 
   g_signal_emit_by_name (priv->splitmux, "split-at-running-time", time);
+  priv->have_split_at_running_time = TRUE;
 }
 
 static void
