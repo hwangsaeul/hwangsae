@@ -40,6 +40,11 @@ HwangsaeTransmuxer     *hwangsae_transmuxer_new          (void);
  * @error: a #GError
  *
  * Starts the merging process.
+ *
+ * When time- or size-based splitting is enabled, @output can contain a pattern
+ * that gets replaced with current segment number. For example 'out-%d.mp4' will
+ * create out-0.mp4, out-1.mp4, etc.. Otherwise the segment number will be put
+ * as a suffix to each output filename (out.mp4.00000, out.mp4.00001, etc.).
  */
 void                    hwangsae_transmuxer_merge        (HwangsaeTransmuxer  *transmuxer,
                                                           GSList              *input_files,
