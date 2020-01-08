@@ -425,6 +425,16 @@ hwangsae_transmuxer_merge (HwangsaeTransmuxer * self, GSList * input_files,
   hwangsae_transmuxer_clear (self);
 }
 
+void
+hwangsae_transmuxer_split_at_running_time (HwangsaeTransmuxer * self,
+    GstClockTime time)
+{
+  HwangsaeTransmuxerPrivate *priv =
+      hwangsae_transmuxer_get_instance_private (self);
+
+  g_signal_emit_by_name (priv->splitmux, "split-at-running-time", time);
+}
+
 static void
 hwangsae_transmuxer_set_property (GObject * object, guint property_id,
     const GValue * value, GParamSpec * pspec)

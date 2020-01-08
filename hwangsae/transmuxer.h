@@ -23,7 +23,7 @@
 #error "Only <hwangsae/hwangsae.h> can be included directly."
 #endif
 
-#include <glib-object.h>
+#include <gst/gstclock.h>
 
 G_BEGIN_DECLS
 
@@ -92,6 +92,18 @@ void                    hwangsae_transmuxer_set_max_size_bytes
  guint64                 hwangsae_transmuxer_get_max_size_bytes
                                                        (HwangsaeTransmuxer    *self);
 
+/**
+ * hwangsae_transmuxer_split_at_running_time:
+ * @self: a HwangsaeRecorder object
+ * @time: split timestamp
+ *
+ * Orders the transmuxer to split the output file when the recording reaches
+ * @time. If the function is called multiple times, a split will occur on each
+ * passed timestamp.
+ */
+void                     hwangsae_transmuxer_split_at_running_time
+                                                       (HwangsaeTransmuxer    *self,
+                                                        GstClockTime           time);
 
 G_END_DECLS
 
