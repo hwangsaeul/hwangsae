@@ -37,7 +37,7 @@ typedef struct
   GstElement *concat;
 
   GList *segments;
-  guint current_segment_link;
+  GList *current_segment_link;
 
   guint64 max_size_time;
   guint64 max_size_bytes;
@@ -138,8 +138,7 @@ hwangsae_transmuxer_get_max_size_bytes (HwangsaeTransmuxer * self)
 
 
 static gint _find_segment_by_parsebin (gconstpointer a, gconstpointer b);
-static void hwangsae_transmuxer_link_segment (HwangsaeTransmuxer * self,
-    Segment * segment);
+static void hwangsae_transmuxer_link_next_segment (HwangsaeTransmuxer * self);
 
 static gboolean
 _bus_watch (GstBus * bus, GstMessage * message, gpointer user_data)
@@ -162,18 +161,12 @@ _bus_watch (GstBus * bus, GstMessage * message, gpointer user_data)
 
       if (err->domain == GST_STREAM_ERROR
           && err->code == GST_STREAM_ERROR_FAILED) {
-        Segment *segment;
+        Segment *segment = priv->current_segment_link->data;
 
-        g_warning ("Stream error, omitting current segment");
+        g_warning ("Error while processing %s. The file is likely corrupted.",
+            segment->filename);
 
-        segment =
-            g_list_nth_data (priv->segments, priv->current_segment_link++);
-
-        if (segment) {
-          hwangsae_transmuxer_link_segment (self, segment);
-        } else {
-          gst_element_set_state (priv->pipeline, GST_STATE_PLAYING);
-        }
+        hwangsae_transmuxer_link_next_segment (self);
       }
       break;
     }
@@ -231,26 +224,42 @@ _find_segment_by_parsebin (gconstpointer a, gconstpointer b)
 static void _pad_added (GstElement * element, GstPad * pad, gpointer user_data);
 
 static void
-hwangsae_transmuxer_link_segment (HwangsaeTransmuxer * self, Segment * segment)
+hwangsae_transmuxer_link_next_segment (HwangsaeTransmuxer * self)
 {
   HwangsaeTransmuxerPrivate *priv =
       hwangsae_transmuxer_get_instance_private (self);
 
-  GstElement *filesrc;
+  if (!priv->current_segment_link) {
+    /* We're linking the first segment. */
+    priv->current_segment_link = priv->segments;
+  } else {
+    priv->current_segment_link = priv->current_segment_link->next;
+  }
 
-  filesrc = gst_element_factory_make ("filesrc", NULL);
-  g_object_set (filesrc, "location", segment->filename, NULL);
+  if (priv->current_segment_link) {
+    Segment *segment;
+    GstElement *filesrc;
 
-  segment->parsebin = gst_element_factory_make ("parsebin", NULL);
+    segment = priv->current_segment_link->data;
 
-  gst_bin_add_many (GST_BIN (priv->pipeline), filesrc, segment->parsebin, NULL);
-  gst_element_link (filesrc, segment->parsebin);
+    filesrc = gst_element_factory_make ("filesrc", NULL);
+    g_object_set (filesrc, "location", segment->filename, NULL);
 
-  gst_element_sync_state_with_parent (filesrc);
-  gst_element_sync_state_with_parent (segment->parsebin);
+    segment->parsebin = gst_element_factory_make ("parsebin", NULL);
 
-  g_signal_connect (segment->parsebin, "pad-added", G_CALLBACK (_pad_added),
-      self);
+    gst_bin_add_many (GST_BIN (priv->pipeline), filesrc, segment->parsebin,
+        NULL);
+    gst_element_link (filesrc, segment->parsebin);
+
+    gst_element_sync_state_with_parent (filesrc);
+    gst_element_sync_state_with_parent (segment->parsebin);
+
+    g_signal_connect (segment->parsebin, "pad-added", G_CALLBACK (_pad_added),
+        self);
+  } else {
+    /* All segments have been linked. Start the pipeline. */
+    gst_element_set_state (priv->pipeline, GST_STATE_PLAYING);
+  }
 }
 
 static void
@@ -261,23 +270,16 @@ _pad_added (GstElement * element, GstPad * pad, gpointer user_data)
       hwangsae_transmuxer_get_instance_private (user_data);
 
   Segment *segment;
-  GList *item;
 
   g_mutex_lock (&priv->lock);
 
-  item = g_list_find_custom (priv->segments, element,
-      _find_segment_by_parsebin);
-  segment = item->data;
+  segment = priv->current_segment_link->data;
+
+  g_assert (segment->parsebin == element);
 
   gst_element_link (segment->parsebin, priv->concat);
 
-  priv->current_segment_link++;
-
-  if (item->next) {
-    hwangsae_transmuxer_link_segment (self, (Segment *) item->next->data);
-  } else {
-    gst_element_set_state (priv->pipeline, GST_STATE_PLAYING);
-  }
+  hwangsae_transmuxer_link_next_segment (self);
 
   g_mutex_unlock (&priv->lock);
 }
@@ -294,7 +296,7 @@ hwangsae_transmuxer_clear (HwangsaeTransmuxer * self)
 
   g_list_free_full (priv->segments, (GDestroyNotify) _free_segment);
   priv->segments = NULL;
-  priv->current_segment_link = 0;
+  priv->current_segment_link = NULL;
   priv->have_eos = FALSE;
   gst_clear_object (&priv->concat);
   gst_clear_object (&priv->pipeline);
@@ -411,8 +413,7 @@ hwangsae_transmuxer_merge (HwangsaeTransmuxer * self, GSList * input_files,
   gst_pad_add_probe (pad, GST_PAD_PROBE_TYPE_EVENT_DOWNSTREAM, _src_probe, self,
       NULL);
 
-  hwangsae_transmuxer_link_segment (self, g_list_nth_data (priv->segments,
-          priv->current_segment_link++));
+  hwangsae_transmuxer_link_next_segment (self);
 
   gst_element_set_state (priv->pipeline, GST_STATE_PAUSED);
 
