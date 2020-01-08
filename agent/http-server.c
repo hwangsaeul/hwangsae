@@ -126,6 +126,7 @@ http_cb (SoupServer * server, SoupMessage * msg, const char *path,
   g_autofree gchar *file_id = NULL;
   g_autofree gchar *recording_edge_dir = NULL;
   g_autofree gchar *file_path = NULL;
+  g_autofree gchar *file_name = NULL;
   GMappedFile *mapping;
   GStatBuf st;
   SoupBuffer *buffer;
@@ -187,6 +188,9 @@ http_cb (SoupServer * server, SoupMessage * msg, const char *path,
   soup_message_body_append_buffer (msg->response_body, buffer);
   soup_buffer_free (buffer);
   soup_message_set_status (msg, SOUP_STATUS_OK);
+
+  file_name = g_path_get_basename (file_path);
+  soup_message_headers_append (msg->response_headers, "filename", file_name);
 }
 
 static void
