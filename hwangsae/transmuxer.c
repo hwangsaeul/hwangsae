@@ -35,6 +35,7 @@ typedef struct
 
   GstElement *pipeline;
   GstElement *concat;
+  GstElement *splitmux;
 
   GList *segments;
   GList *current_segment_link;
@@ -101,6 +102,11 @@ hwangsae_transmuxer_init (HwangsaeTransmuxer * self)
   }
 
   g_mutex_init (&priv->lock);
+
+  priv->splitmux =
+      gst_object_ref_sink (gst_element_factory_make ("splitmuxsink", NULL));
+  g_object_set (priv->splitmux, "async-finalize", TRUE,
+      "muxer-factory", "mp4mux", NULL);
 }
 
 void
@@ -370,10 +376,10 @@ hwangsae_transmuxer_merge (HwangsaeTransmuxer * self, GSList * input_files,
   HwangsaeTransmuxerPrivate *priv =
       hwangsae_transmuxer_get_instance_private (self);
 
-  g_autoptr (GstElement) sink = NULL;
   g_autoptr (GstPad) pad = NULL;
   g_autoptr (GstBus) bus = NULL;
   g_autoptr (GError) parse_error = NULL;
+  GstElement *parse = NULL;
 
   g_return_if_fail (input_files != NULL);
   g_return_if_fail (output != NULL);
@@ -387,27 +393,22 @@ hwangsae_transmuxer_merge (HwangsaeTransmuxer * self, GSList * input_files,
     return;
   }
 
-  priv->pipeline = gst_parse_launch ("concat name=concat ! h264parse ! "
-      "splitmuxsink name=sink async-finalize=true muxer-factory=mp4mux",
-      &parse_error);
+  priv->pipeline = gst_pipeline_new (NULL);
+  priv->concat =
+      gst_object_ref_sink (gst_element_factory_make ("concat", NULL));
+  parse = gst_element_factory_make ("h264parse", NULL);
 
-  if (parse_error) {
-    g_propagate_error (error, parse_error);
-    return;
-  }
+  gst_bin_add_many (GST_BIN (priv->pipeline), priv->concat, parse,
+      priv->splitmux, NULL);
+  gst_element_link_many (priv->concat, parse, priv->splitmux, NULL);
 
   bus = gst_element_get_bus (priv->pipeline);
   gst_bus_add_watch (bus, _bus_watch, self);
 
-  priv->concat = gst_bin_get_by_name (GST_BIN (priv->pipeline), "concat");
-  sink = gst_bin_get_by_name (GST_BIN (priv->pipeline), "sink");
-
   g_object_set (priv->concat, "adjust-base", FALSE, NULL);
-  g_object_set (sink, "location", output, NULL);
-  if (priv->max_size_time || priv->max_size_bytes) {
-    g_object_set (sink, "max-size-time", priv->max_size_time,
-        "max-size-bytes", priv->max_size_bytes, NULL);
-  }
+  g_object_set (priv->splitmux, "location", output, NULL);
+  g_object_set (priv->splitmux, "max-size-time", priv->max_size_time,
+      "max-size-bytes", priv->max_size_bytes, NULL);
 
   pad = gst_element_get_static_pad (priv->concat, "src");
   gst_pad_add_probe (pad, GST_PAD_PROBE_TYPE_EVENT_DOWNSTREAM, _src_probe, self,
@@ -467,6 +468,8 @@ hwangsae_transmuxer_finalize (GObject * object)
 {
   HwangsaeTransmuxerPrivate *priv =
       hwangsae_transmuxer_get_instance_private (HWANGSAE_TRANSMUXER (object));
+
+  gst_clear_object (&priv->splitmux);
 
   g_mutex_clear (&priv->lock);
 
