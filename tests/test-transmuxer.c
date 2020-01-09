@@ -65,7 +65,7 @@ test_15s_with_gap (void)
 }
 
 static void
-test_corrupted (void)
+test_corrupted_empty (void)
 {
   g_autoptr (HwangsaeTransmuxer) transmuxer = NULL;
   g_autoptr (GError) error = NULL;
@@ -78,7 +78,7 @@ test_corrupted (void)
 
   input_files = g_slist_append (input_files,
       g_test_build_filename (G_TEST_DIST,
-          "data/test-corrupted-5000000-10000000.ts", NULL));
+          "data/test-empty-5000000-10000000.ts", NULL));
 
   input_files =
       g_slist_append (input_files, g_test_build_filename (G_TEST_DIST,
@@ -102,6 +102,84 @@ test_corrupted (void)
   gap = hwangsae_test_get_gap_duration (output_file);
   g_assert_cmpint (labs (GST_CLOCK_DIFF (gap, 5 * GST_SECOND)), <=,
       20 * GST_MSECOND);
+
+  g_slist_free_full (input_files, g_free);
+
+  g_unlink (output_file);
+}
+
+static void
+test_corrupted_truncated (void)
+{
+  g_autoptr (HwangsaeTransmuxer) transmuxer = NULL;
+  g_autoptr (GError) error = NULL;
+  g_autofree gchar *output_file = NULL;
+  GSList *input_files = NULL;
+  GstClockTimeDiff gap;
+
+  input_files = g_slist_append (input_files,
+      g_test_build_filename (G_TEST_DIST, "data/test-0-5000000.ts", NULL));
+
+  input_files = g_slist_append (input_files,
+      g_test_build_filename (G_TEST_DIST,
+          "data/test-truncated-5000000-10000000.ts", NULL));
+
+  input_files =
+      g_slist_append (input_files, g_test_build_filename (G_TEST_DIST,
+          "data/test-10000000-15000000.ts", NULL));
+
+  transmuxer = hwangsae_transmuxer_new ();
+
+  output_file =
+      g_build_filename (g_get_tmp_dir (), "transmuxer-test-XXXXXX.mp4", NULL);
+  g_close (g_mkstemp (output_file), NULL);
+
+  hwangsae_transmuxer_merge (transmuxer, input_files, output_file, &error);
+
+  g_assert_no_error (error);
+
+  /* Total file duration should be 15 seconds. */
+  g_assert_cmpuint (hwangsae_test_get_file_duration (output_file), ==,
+      15 * GST_SECOND);
+
+  /* Gap should last below 5 seconds. */
+  gap = hwangsae_test_get_gap_duration (output_file);
+  g_assert_cmpint (gap, <=, 5 * GST_SECOND);
+
+  g_slist_free_full (input_files, g_free);
+
+  g_unlink (output_file);
+}
+
+static void
+test_corrupted_missing (void)
+{
+  g_autoptr (HwangsaeTransmuxer) transmuxer = NULL;
+  g_autoptr (GError) error = NULL;
+  g_autofree gchar *output_file = NULL;
+  GSList *input_files = NULL;
+
+  input_files = g_slist_append (input_files,
+      g_test_build_filename (G_TEST_DIST, "data/test-0-5000000.ts", NULL));
+
+  input_files = g_slist_append (input_files,
+      g_test_build_filename (G_TEST_DIST,
+          "data/test-missing-5000000-10000000.ts", NULL));
+
+  input_files =
+      g_slist_append (input_files, g_test_build_filename (G_TEST_DIST,
+          "data/test-10000000-15000000.ts", NULL));
+
+  transmuxer = hwangsae_transmuxer_new ();
+
+  output_file =
+      g_build_filename (g_get_tmp_dir (), "transmuxer-test-XXXXXX.mp4", NULL);
+  g_close (g_mkstemp (output_file), NULL);
+
+  hwangsae_transmuxer_merge (transmuxer, input_files, output_file, &error);
+
+  g_assert_true (g_error_matches (error, HWANGSAE_TRANSMUXER_ERROR,
+          HWANGSAE_TRANSMUXER_ERROR_MISSING_FILE));
 
   g_slist_free_full (input_files, g_free);
 
@@ -335,7 +413,14 @@ main (int argc, char *argv[])
 
   g_test_add_func ("/hwangsae/transmuxer-15s-with-gap", test_15s_with_gap);
 
-  g_test_add_func ("/hwangsae/transmuxer-corrupted", test_corrupted);
+  g_test_add_func ("/hwangsae/transmuxer-corrupted-empty",
+      test_corrupted_empty);
+
+  g_test_add_func ("/hwangsae/transmuxer-corrupted-truncated",
+      test_corrupted_truncated);
+
+  g_test_add_func ("/hwangsae/transmuxer-corrupted-missing",
+      test_corrupted_missing);
 
   g_test_add_func ("/hwangsae/transmuxer-split_time", test_split_time);
 

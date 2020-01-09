@@ -49,6 +49,7 @@ GQuark hwangsae_transmuxer_error_quark (void);
 typedef enum {
   HWANGSAE_TRANSMUXER_ERROR_OVERLAP = 1,
   HWANGSAE_TRANSMUXER_ERROR_INVALID_PARAMETER,
+  HWANGSAE_TRANSMUXER_ERROR_MISSING_FILE,
 } HwangsaeTransmuxerError;
 
 #endif // __HWANGSAE_TYPES_H__
