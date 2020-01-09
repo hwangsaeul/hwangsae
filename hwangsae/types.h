@@ -1,5 +1,5 @@
 /**
- *  Copyright 2019 SK Telecom Co., Ltd.
+ *  Copyright 2019-2020 SK Telecom Co., Ltd.
  *    Author: Jeongseok Kim <jeongseok.kim@sk.com>
  *
  *  Licensed under the Apache License, Version 2.0 (the "License");
@@ -48,6 +48,7 @@ GQuark hwangsae_transmuxer_error_quark (void);
 
 typedef enum {
   HWANGSAE_TRANSMUXER_ERROR_OVERLAP = 1,
+  HWANGSAE_TRANSMUXER_ERROR_INVALID_PARAMETER,
 } HwangsaeTransmuxerError;
 
 #endif // __HWANGSAE_TYPES_H__
