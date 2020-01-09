@@ -16,6 +16,7 @@ source_c = [
   'recorder.c',
   'relay.c',
   'transmuxer.c',
+  'types.c',
   'common.c'
 ]
 
