@@ -108,45 +108,20 @@ test_corrupted (void)
   g_unlink (output_file);
 }
 
-static void
-_rmdir_non_empty (gchar * folder)
-{
-  g_autoptr (GDir) dir = NULL;
-  g_autoptr (GError) error = NULL;
-  const gchar *filename = NULL;
-  g_autofree gchar *filepath = NULL;
-
-  dir = g_dir_open (folder, 0, &error);
-  if (error)
-    return;
-
-  while ((filename = g_dir_read_name (dir))) {
-    filepath = g_build_filename (folder, filename, NULL);
-    g_unlink (filepath);
-  }
-
-  g_rmdir (folder);
-
-}
-
 static gint
 gchar_compare (gconstpointer a, gconstpointer b)
 {
-  gchar *str_a = *(gchar **) a;
-  gchar *str_b = *(gchar **) b;
-
-  return g_strcmp0 (str_a, str_b);
+  return g_strcmp0 ((gchar *) a, (gchar *) b);
 }
 
-static void
-test_split_time_bytes (gint64 time, gint64 bytes)
+static GSList *
+test_split (HwangsaeTransmuxer * transmuxer)
 {
-  g_autoptr (HwangsaeTransmuxer) transmuxer = NULL;
   g_autoptr (GError) error = NULL;
   g_autofree gchar *output_folder = NULL;
   g_autofree gchar *output_file = NULL;
   GSList *input_files = NULL;
-  g_autoptr (GArray) file_list = NULL;
+  GSList *output_files = NULL;
   g_autoptr (GDir) dir = NULL;
   const gchar *filename = NULL;
 
@@ -159,8 +134,6 @@ test_split_time_bytes (gint64 time, gint64 bytes)
       g_test_build_filename (G_TEST_DIST, "data/test-10000000-15000000.ts",
           NULL));
 
-  transmuxer = hwangsae_transmuxer_new ();
-
   output_folder =
       g_build_filename (g_get_tmp_dir (), "transmuxer-test-XXXXXX", NULL);
   g_mkdtemp (output_folder);
@@ -168,11 +141,6 @@ test_split_time_bytes (gint64 time, gint64 bytes)
   g_debug ("using folder %s\n", output_folder);
 
   output_file = g_build_filename (output_folder, "%05d.mp4", NULL);
-
-  if (time)
-    hwangsae_transmuxer_set_max_size_time (transmuxer, time);
-  else if (bytes)
-    hwangsae_transmuxer_set_max_size_bytes (transmuxer, bytes);
 
   hwangsae_transmuxer_merge (transmuxer, input_files, output_file, &error);
 
@@ -185,61 +153,94 @@ test_split_time_bytes (gint64 time, gint64 bytes)
 
   g_assert_no_error (error);
 
-  file_list = g_array_new (TRUE, TRUE, sizeof (gchar *));
   while ((filename = g_dir_read_name (dir))) {
-    g_array_append_val (file_list, filename);
+    output_files = g_slist_insert_sorted (output_files,
+        g_build_filename (output_folder, filename, NULL), gchar_compare);
   }
 
-  g_array_sort (file_list, gchar_compare);
-
-  for (gint i = 0; i < file_list->len; i++) {
-    g_autofree gchar *filepath = NULL;
-
-    filename = g_array_index (file_list, gchar *, i);
-    filepath = g_build_filename (output_folder, filename, NULL);
-
-    g_debug ("Checking file %s", filename);
-    if (time) {
-      GstClockTime duration = hwangsae_test_get_file_duration (filepath);
-
-      g_debug ("%s has duration %" GST_TIME_FORMAT, filename,
-          GST_TIME_ARGS (duration));
-      if (i < file_list->len - 1) {
-        g_assert_cmpint (labs (GST_CLOCK_DIFF (duration, time)), <=,
-            GST_SECOND);
-      } else {
-        /* The final segment shouldn't be longer than FILE_SEGMENT_LEN. */
-        g_assert_cmpint (duration, <=, time);
-      }
-    } else if (bytes) {
-      GStatBuf stat_buf;
-
-      g_assert (g_stat (filepath, &stat_buf) == 0);
-
-      g_debug ("%s has size %luB", filepath, stat_buf.st_size);
-
-      if (i < file_list->len - 1) {
-        g_assert_cmpint (labs (stat_buf.st_size - bytes), <=, bytes / 5);
-      } else {
-        /* The final segment shouldn't be longer than FILE_SEGMENT_LEN_BYTES. */
-        g_assert_cmpint (stat_buf.st_size, <=, bytes);
-      }
-    }
-  }
-
-  _rmdir_non_empty (output_folder);
+  return output_files;
 }
 
 static void
 test_split_time (void)
 {
-  test_split_time_bytes (3 * GST_SECOND, 0);
+  const GstClockTime SPLIT_TIME = 3 * GST_SECOND;
+
+  g_autoptr (HwangsaeTransmuxer) transmuxer = hwangsae_transmuxer_new ();
+  GSList *files;
+  GSList *it;
+
+  hwangsae_transmuxer_set_max_size_time (transmuxer, SPLIT_TIME);
+
+  files = test_split (transmuxer);
+
+  for (it = files; it; it = it->next) {
+    gchar *filepath = it->data;
+    g_autofree gchar *filename = g_path_get_basename (filepath);
+    GstClockTime duration;
+
+    duration = hwangsae_test_get_file_duration (filepath);
+    g_debug ("%s has duration %" GST_TIME_FORMAT, filename,
+        GST_TIME_ARGS (duration));
+
+    if (it->next) {
+      g_assert_cmpint (labs (GST_CLOCK_DIFF (duration, SPLIT_TIME)), <=,
+          GST_SECOND);
+    } else {
+      /* The final segment shouldn't be longer than SPLIT_TIME. */
+      g_assert_cmpint (duration, <=, SPLIT_TIME);
+    }
+
+    g_unlink (filepath);
+  }
+
+  if (files) {
+    g_autofree gchar *dirname = g_path_get_dirname (files->data);
+    g_rmdir (dirname);
+  }
+
+  g_slist_free_full (files, g_free);
 }
 
 static void
 test_split_bytes (void)
 {
-  test_split_time_bytes (0, 1 * 1024 * 1024);
+  const guint64 SPLIT_BYTES = 1 * 1024 * 1024;
+
+  g_autoptr (HwangsaeTransmuxer) transmuxer = hwangsae_transmuxer_new ();
+  GSList *files;
+  GSList *it;
+
+  hwangsae_transmuxer_set_max_size_bytes (transmuxer, SPLIT_BYTES);
+
+  files = test_split (transmuxer);
+
+  for (it = files; it; it = it->next) {
+    gchar *filepath = it->data;
+    g_autofree gchar *filename = g_path_get_basename (filepath);
+    GStatBuf stat_buf;
+
+    g_assert (g_stat (filepath, &stat_buf) == 0);
+
+    g_debug ("%s has size %luB", filename, stat_buf.st_size);
+
+    if (it->next) {
+      g_assert_cmpint (labs (stat_buf.st_size - SPLIT_BYTES), <=,
+          SPLIT_BYTES / 5);
+    } else {
+      /* The final segment shouldn't be longer than SPLIT_BYTES. */
+      g_assert_cmpint (stat_buf.st_size, <=, SPLIT_BYTES);
+    }
+
+    g_unlink (filepath);
+  }
+
+  if (files) {
+    g_autofree gchar *dirname = g_path_get_dirname (files->data);
+    g_rmdir (dirname);
+  }
+
+  g_slist_free_full (files, g_free);
 }
 
 static void
