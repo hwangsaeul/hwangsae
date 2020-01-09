@@ -1,5 +1,5 @@
 /**
- *  Copyright 2019 SK Telecom Co., Ltd.
+ *  Copyright 2019-2020 SK Telecom Co., Ltd.
  *    Author: Jakub Adam <jakub.adam@collabora.com>
  *
  *  Licensed under the Apache License, Version 2.0 (the "License");
@@ -48,8 +48,6 @@ typedef struct
 
 /* *INDENT-OFF* */
 G_DEFINE_TYPE_WITH_PRIVATE (HwangsaeTransmuxer, hwangsae_transmuxer, G_TYPE_OBJECT)
-
-G_DEFINE_QUARK (hwangsae-transmuxer-error-quark, hwangsae_transmuxer_error)
 /* *INDENT-ON* */
 
 typedef struct
