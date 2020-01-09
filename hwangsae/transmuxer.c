@@ -339,9 +339,9 @@ hwangsae_transmuxer_parse_segments (HwangsaeTransmuxer * self,
 
   /* Make base times start from zero. */
   for (it = g_list_last (segments); it; it = it->prev) {
+    ((Segment *) it->data)->end_time -= ((Segment *) segments->data)->base_time;
     ((Segment *) it->data)->base_time -=
         ((Segment *) segments->data)->base_time;
-    ((Segment *) it->data)->end_time -= ((Segment *) segments->data)->base_time;
   }
 
   priv->segments = segments;
