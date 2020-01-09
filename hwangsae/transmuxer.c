@@ -308,6 +308,22 @@ hwangsae_transmuxer_clear (HwangsaeTransmuxer * self)
   gst_clear_object (&priv->pipeline);
 }
 
+static GSList *
+_check_input_files (GSList * input_files)
+{
+  for (GSList * it = input_files; it;) {
+    GSList *next = g_slist_next (it);
+    gchar *file = it->data;
+    if (!g_file_test (file, G_FILE_TEST_IS_REGULAR)) {
+      g_warning ("File %s not found, ominting it", file);
+      input_files = g_slist_delete_link (input_files, it);
+    }
+    it = next;
+  }
+
+  return input_files;
+}
+
 static void
 hwangsae_transmuxer_parse_segments (HwangsaeTransmuxer * self,
     GSList * input_files)
@@ -384,6 +400,8 @@ hwangsae_transmuxer_merge (HwangsaeTransmuxer * self, GSList * input_files,
 
   g_return_if_fail (input_files != NULL);
   g_return_if_fail (output != NULL);
+
+  input_files = _check_input_files (input_files);
 
   hwangsae_transmuxer_parse_segments (self, input_files);
 
