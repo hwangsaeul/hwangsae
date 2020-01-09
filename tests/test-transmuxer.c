@@ -244,6 +244,53 @@ test_split_bytes (void)
 }
 
 static void
+test_split_ondemand (void)
+{
+  /* Sum of durations must equal total length of input in test_split (). */
+  GstClockTime OUTPUT_SEGMENT_DURATIONS[] = {
+    2 * GST_SECOND, 5 * GST_SECOND, 3 * GST_SECOND, 5 * GST_SECOND
+  };
+
+  g_autoptr (HwangsaeTransmuxer) transmuxer = hwangsae_transmuxer_new ();
+  GstClockTime split_at_time = 0;
+  GSList *files;
+  GSList *it;
+  gint i;
+
+  for (i = 0; i != G_N_ELEMENTS (OUTPUT_SEGMENT_DURATIONS) - 1; ++i) {
+    split_at_time += OUTPUT_SEGMENT_DURATIONS[i];
+    hwangsae_transmuxer_split_at_running_time (transmuxer, split_at_time);
+  }
+
+  files = test_split (transmuxer);
+
+  g_assert_cmpint (g_slist_length (files), ==,
+      G_N_ELEMENTS (OUTPUT_SEGMENT_DURATIONS));
+
+  i = 0;
+  for (it = files; it; it = it->next) {
+    gchar *filepath = it->data;
+    g_autofree gchar *filename = g_path_get_basename (filepath);
+    GstClockTime duration;
+
+    duration = hwangsae_test_get_file_duration (filepath);
+    g_debug ("%s has duration %" GST_TIME_FORMAT, filename,
+        GST_TIME_ARGS (duration));
+
+    g_assert_cmpint (duration, ==, OUTPUT_SEGMENT_DURATIONS[i++]);
+
+    g_unlink (filepath);
+  }
+
+  if (files) {
+    g_autofree gchar *dirname = g_path_get_dirname (files->data);
+    g_rmdir (dirname);
+  }
+
+  g_slist_free_full (files, g_free);
+}
+
+static void
 test_overlap (void)
 {
   g_autoptr (HwangsaeTransmuxer) transmuxer = NULL;
@@ -293,6 +340,8 @@ main (int argc, char *argv[])
   g_test_add_func ("/hwangsae/transmuxer-split_time", test_split_time);
 
   g_test_add_func ("/hwangsae/transmuxer-split_bytes", test_split_bytes);
+
+  g_test_add_func ("/hwangsae/transmuxer-split_ondemand", test_split_ondemand);
 
   g_test_add_func ("/hwangsae/transmuxer-overlap", test_overlap);
 
