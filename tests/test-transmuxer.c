@@ -25,6 +25,9 @@
 #include <glib/gstdio.h>
 #include <gst/gstclock.h>
 
+#define TS_SYNC_BYTE 0x47
+#define TS_PACKET_SIZE 188
+
 static void
 test_15s_with_gap (void)
 {
@@ -108,21 +111,69 @@ test_corrupted_empty (void)
   g_unlink (output_file);
 }
 
+static gboolean
+_generate_truncated_file (gchar * src, gchar * dst)
+{
+  gsize len, i;
+  g_autofree gchar *buffer = NULL;
+  g_autoptr (GError) error = NULL;
+
+  g_file_get_contents (src, &buffer, &len, &error);
+
+  g_assert_no_error (error);
+
+  // Use len = len / 2 to truncate file in the middle
+  len = len / 2;
+
+  // Find the last start of TS packet present in first middle part of buffer
+  for (i = len; i > 0; i--) {
+    if (buffer[i] == TS_SYNC_BYTE)
+      break;
+  }
+
+  // From the start of TS packet goes backward half TS_PACKET_SIZE bytes
+  // to have the buffer truncated in the middle of the packet
+  i -= TS_PACKET_SIZE / 2;
+
+  if (i < 0)
+    return FALSE;
+
+  g_file_set_contents (dst, buffer, i, &error);
+
+  g_assert_no_error (error);
+
+  return TRUE;
+}
+
 static void
 test_corrupted_truncated (void)
 {
   g_autoptr (HwangsaeTransmuxer) transmuxer = NULL;
   g_autoptr (GError) error = NULL;
+  g_autofree gchar *base_file = NULL;
   g_autofree gchar *output_file = NULL;
+  gchar *truncated_file = NULL;
   GSList *input_files = NULL;
   GstClockTimeDiff gap;
+
+  base_file =
+      g_test_build_filename (G_TEST_DIST, "data/test-0-5000000.ts", NULL);
+
+  truncated_file =
+      g_build_filename (g_get_tmp_dir (),
+      "transmuxer-test-XXXXXX-5000000-10000000.ts", NULL);
+
+  g_close (g_mkstemp (truncated_file), NULL);
+
+  g_debug ("Using truncated file %s", truncated_file);
+  if (!_generate_truncated_file (base_file, truncated_file)) {
+    g_error ("Unable to generate temporary truncated file");
+  }
 
   input_files = g_slist_append (input_files,
       g_test_build_filename (G_TEST_DIST, "data/test-0-5000000.ts", NULL));
 
-  input_files = g_slist_append (input_files,
-      g_test_build_filename (G_TEST_DIST,
-          "data/test-truncated-5000000-10000000.ts", NULL));
+  input_files = g_slist_append (input_files, truncated_file);
 
   input_files =
       g_slist_append (input_files, g_test_build_filename (G_TEST_DIST,
@@ -147,6 +198,8 @@ test_corrupted_truncated (void)
   g_assert_cmpint (gap, <=, 5 * GST_SECOND);
 
   g_slist_free_full (input_files, g_free);
+
+  g_unlink (truncated_file);
 
   g_unlink (output_file);
 }
