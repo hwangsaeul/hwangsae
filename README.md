@@ -14,7 +14,34 @@ Hwangsae Relay performs the SRT relay. Edge devices send one SRT stream to Relay
 *   [**gaeugli**](https://github.com/hwangsaeul/gaeguli): to handle the SRT streaming
 
 #### Recorder
-Hwangsae Recorder allows the system to record streaming from an Edge device via the Hwangsae Relay.
+Hwangsae Recorder allows the system to record streaming from an Edge device via the Hwangsae Relay. The module can also split the output across multiple files to improve recording handling.
+
+#### Transmuxer
+Hwangsae Transmuxer allows to merge several `.ts` files in a single `.mp4` file properly handling `gaps` between input segments. The module can also split the output across multiple files to improve recording handling.
+
+### Tools
+
+### Recorder tool
+Command line tool to record SRT streams.
+
+**Usage**
+```console
+$ hwangsae-recorder-1.0 uri
+```
+uri: Source SRT stream URI
+
+### Transmuxer tool
+Command line tool to merge several `.ts` files into a single `.mp4` file.
+
+**Usage**
+```console
+$ hwangsae-transmuxer-1.0 [options] files
+```
+files: List of input files
+
+**Options**
+*   -o: Output file name
+*   -s: Time to use for splitting, can be used multiple times
 
 ### Agents
 Role of agents are for communicating with another process. Agents include D-BUS API that is created by code generator from defined XML in the path of chamge/dbus/.
