@@ -127,6 +127,7 @@ http_cb (SoupServer * server, SoupMessage * msg, const char *path,
   g_autofree gchar *recording_edge_dir = NULL;
   g_autofree gchar *file_path = NULL;
   g_autofree gchar *file_name = NULL;
+  g_autoptr (GHashTable) params = NULL;
   GMappedFile *mapping;
   GStatBuf st;
   SoupBuffer *buffer;
@@ -189,8 +190,11 @@ http_cb (SoupServer * server, SoupMessage * msg, const char *path,
   soup_buffer_free (buffer);
   soup_message_set_status (msg, SOUP_STATUS_OK);
 
+  params = g_hash_table_new (g_str_hash, g_str_equal);
   file_name = g_path_get_basename (file_path);
-  soup_message_headers_append (msg->response_headers, "filename", file_name);
+  g_hash_table_insert (params, "filename", file_name);
+  soup_message_headers_set_content_disposition (msg->response_headers,
+      "attachment", params);
 }
 
 static void
