@@ -101,8 +101,8 @@ main (int argc, char *argv[])
 
   gst_init (&argc, &argv);
 
-  group = g_option_group_new ("FIFO transmit options",
-      "Options understood by Gaeguli FIFO transmit", NULL, &options, NULL);
+  group = g_option_group_new ("Recorder options",
+      "Options understood by Hwangsae Recorder", NULL, &options, NULL);
   g_option_group_add_entries (group, entries);
 
   context = g_option_context_new (NULL);
