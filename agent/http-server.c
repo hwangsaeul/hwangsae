@@ -195,6 +195,8 @@ http_cb (SoupServer * server, SoupMessage * msg, const char *path,
   g_hash_table_insert (params, "filename", file_name);
   soup_message_headers_set_content_disposition (msg->response_headers,
       "attachment", params);
+  soup_message_headers_append (msg->response_headers,
+      "Access-Control-Allow-Origin", "*");
 }
 
 static void
