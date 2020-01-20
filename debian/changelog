@@ -1,5 +1,6 @@
-hwangsae (0.9.0-1) UNRELEASED; urgency=medium
+hwangsae (0.10.0-0h8l4) unstable; urgency=medium
 
+  [ Jeongseok Kim ]
   * Initial release.
 
- -- Jeongseok Kim <jeongseok.kim@sk.com>  Wed, 20 Nov 2019 15:56:34 +0900
+ -- Justin Kim <jeongseok.kim@sk.com>  Mon, 20 Jan 2020 16:31:09 +0900
