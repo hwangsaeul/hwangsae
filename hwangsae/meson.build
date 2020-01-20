@@ -57,14 +57,41 @@ libhwangsae = library(
   install: true
 )
 
-pkg.generate(libhwangsae,
-  libraries : [ gaeguli_dep, chamge_dep, libsrt_dep ],
-  name : meson.project_name(),
-  description : 'A SRT Relay and Recording Library',
-  filebase : hwangsae_api_name,
-  subdirs: hwangsae_api_name,
-  variables: 'exec_prefix=${prefix}'
-)
+if meson.version().version_compare('>= 0.48.2')
+
+  pkg.generate(libhwangsae,
+    libraries : [ gaeguli_dep, chamge_dep, libsrt_dep ],
+    name : meson.project_name(),
+    description : 'A SRT Relay and Recording Library',
+    filebase : hwangsae_api_name,
+    subdirs: hwangsae_api_name,
+    variables: 'exec_prefix=${prefix}'
+  )
+
+else
+
+  pkg.generate(
+    libraries: libhwangsae,
+    version: meson.project_version(),
+    name: meson.project_name(),
+    description: 'A SRT Relay and Recording Library',
+    filebase: hwangsae_api_name,
+    requires: [
+      'gaeguli-1.0', 
+      'chamge-1.0',
+      'srt'
+    ],
+    requires_private: [
+      'glib-2.0 ' + glib_req_version,
+      'gobject-2.0 ' + glib_req_version,
+      'gio-2.0 ' + glib_req_version,
+      'gio-unix-2.0 ' + glib_req_version,
+    ],
+    subdirs: hwangsae_api_name,
+    variables: 'exec_prefix=${prefix}'
+  )
+
+endif
 
 libhwangsae_dep = declare_dependency(link_with: libhwangsae,
   include_directories: [ hwangsae_incs ],

@@ -1,7 +1,7 @@
 project('hwangsae', 'c',
   version: '0.9.0',
   license: 'Apache-2.0',
-  meson_version: '>= 0.51',
+  meson_version: '>= 0.45',
   default_options: [ 'warning_level=1',
                      'buildtype=debugoptimized' ])
 
@@ -62,7 +62,6 @@ chamge_dep = dependency('chamge-1.0', version: hwangsaeul_req_version,
     fallback: ['chamge', 'libchamge_dep'])
 
 gnome = import('gnome')
-python3 = import('python').find_installation()
 
 hwangsae_incs = include_directories('.', 'hwangsae')
 hwangsae_doc_incs = include_directories('hwangsae')
@@ -75,4 +74,8 @@ subdir('tools')
 subdir('tests')
 subdir('doc')
 
-run_command(python3, '-c', 'import shutil; shutil.copy("hooks/pre-commit.hook", ".git/hooks/pre-commit")')
+if meson.version().version_compare('>= 0.46.0')
+  python3 = import('python').find_installation()
+  run_command(python3, '-c',
+    'import shutil; shutil.copy("hooks/pre-commit.hook", ".git/hooks/pre-commit")')
+endif

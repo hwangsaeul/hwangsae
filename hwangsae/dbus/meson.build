@@ -18,12 +18,27 @@ foreach iface: dbus_ifaces
   prefix = 'org.hwangsaeul.Hwangsae1.'
   name = prefix + iface[0] 
 
-  sources += gnome.gdbus_codegen(
-    iface[1],
-    sources: name + '.xml',
-    interface_prefix: prefix,
-    namespace: 'Hwangsae1DBus',
-  )
+  if meson.version().version_compare('>= 0.46.0')
+
+    sources += gnome.gdbus_codegen(
+      iface[1],
+      sources: name + '.xml',
+      interface_prefix: prefix,
+      namespace: 'Hwangsae1DBus',
+    )
+
+  else
+    sources += custom_target(
+      iface[1],
+      input: name + '.xml',
+      output: [iface[1] + '.h', iface[1] + '.c'],
+      command: [
+        find_program('codegen.py'), iface[0], iface[1],
+        meson.current_build_dir(), '@INPUT@'
+      ]
+    )
+  endif
+
 endforeach
 
 libhwangsae_dbus = shared_library(
