@@ -24,6 +24,10 @@
 
 #include <gst/gst.h>
 
+#if !GST_CHECK_VERSION (1,16,0)
+#define gst_clear_object(object_ptr) g_clear_pointer((object_ptr), gst_object_unref)
+#endif
+
 struct _HwangsaeTransmuxer
 {
   GObject parent;
