@@ -570,10 +570,23 @@ hwangsae_recorder_agent_set_property (GObject * object, guint property_id,
       hwangsae_recorder_agent_get_instance_private (self);
 
   switch (property_id) {
-    case PROP_RECORDING_DIR:
+    case PROP_RECORDING_DIR:{
+      const gchar *str = g_value_get_string (value);
+
       g_clear_pointer (&priv->recording_dir, g_free);
-      priv->recording_dir = g_value_dup_string (value);
+      if (str && (str[0] != '\0')) {
+        priv->recording_dir = g_strdup (str);
+      } else {
+        priv->recording_dir = g_build_filename (g_get_user_data_dir (),
+            "hwangsaeul", "hwangsae", "recordings", NULL);
+      }
+
+      if (priv->hwangsae_http_server) {
+        g_object_set (priv->hwangsae_http_server, "recording-dir",
+            priv->recording_dir, NULL);
+      }
       break;
+    }
     case PROP_RELAY_ADDRESS:
       g_clear_pointer (&priv->relay_address, g_free);
       priv->relay_address = g_strdup (g_value_get_string (value));
@@ -689,6 +702,10 @@ hwangsae_recorder_agent_init (HwangsaeRecorderAgent * self)
 
   priv->settings = chamge_common_gsettings_new (HWANGSAE_RECORDER_SCHEMA_ID);
 
+  priv->hwangsae_http_server =
+      hwangsae_http_server_new (g_settings_get_uint (priv->settings,
+          "http-port"));
+
   g_settings_bind (priv->settings, "recording-dir", self, "recording-dir",
       G_SETTINGS_BIND_DEFAULT);
 
@@ -704,6 +721,9 @@ hwangsae_recorder_agent_init (HwangsaeRecorderAgent * self)
   g_settings_bind (priv->settings, "recorder-id", self, "recorder-id",
       G_SETTINGS_BIND_DEFAULT);
 
+  g_settings_bind (priv->settings, "external-ip", priv->hwangsae_http_server,
+      "external-ip", G_SETTINGS_BIND_DEFAULT);
+
   if (!g_strcmp0 (priv->recorder_id, "randomized-string")
       || strnlen (priv->recorder_id, 64) == 0) {
     g_autofree gchar *uid = g_uuid_string_random ();
@@ -712,16 +732,6 @@ hwangsae_recorder_agent_init (HwangsaeRecorderAgent * self)
             64));
     g_object_set (priv, "recorder-id", recorder_id, NULL);
   }
-
-  priv->hwangsae_http_server =
-      hwangsae_http_server_new (g_settings_get_uint (priv->settings,
-          "http-port"));
-
-  g_settings_bind (priv->settings, "recording-dir", priv->hwangsae_http_server,
-      "recording-dir", G_SETTINGS_BIND_DEFAULT);
-
-  g_settings_bind (priv->settings, "external-ip", priv->hwangsae_http_server,
-      "external-ip", G_SETTINGS_BIND_DEFAULT);
 
   priv->manager = hwangsae1_dbus_manager_skeleton_new ();
 
