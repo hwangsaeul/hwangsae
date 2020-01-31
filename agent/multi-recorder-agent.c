@@ -104,12 +104,6 @@ hwangsae_multi_recorder_agent_start_recording (HwangsaeRecorderAgent *
 
   g_debug ("starting to recording stream from %s", url);
 
-  if (g_str_equal (recording_dir, "")) {
-    g_free (recording_dir);
-    recording_dir = g_build_filename (g_get_user_data_dir (),
-        "hwangsaeul", "hwangsae", "recordings", NULL);
-  }
-
   recording_edge_dir = g_build_filename (recording_dir, edge_id, NULL);
 
   filename_prefix = g_strdup_printf ("hwangsae-recording-%ld",
