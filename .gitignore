@@ -60,3 +60,16 @@ build/
 # subprojects
 subprojects/gaeguli/
 subprojects/chamge/
+
+# Debian build
+debian/.debhelper/
+debian/tmp/
+debian/hwangsae-recorder/
+debian/hwangsae-relay/
+debian/hwangsae-tools/
+debian/libhwangsae*/
+debian/*.debhelper
+debian/*.substvars
+debian/files
+debian/substvars
+debian/debhelper-build-stamp
