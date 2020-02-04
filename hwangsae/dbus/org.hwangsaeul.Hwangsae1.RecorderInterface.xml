@@ -39,10 +39,19 @@
     </method>
 
     <!--
-    Lookup-by-edge:
-    @recordId:        an unique id of record
+    LookupByEdge:
+    @edgeId:          a unique ID of an edge device
+    @from:            start timestamp of the time range in which to search
+                      in microseconds since Jan 01 1970
+    @to:              end timestamp of the time range in which to search
+                      in microseconds since Jan 01 1970
 
-    Lookup by record or range from-to
+    @records:         an array where each item represents a found recording 
+
+    Looks up recordings from an edge device taken during given time range.
+
+    The meaning of the values in each array item is: recording ID, fileID,
+    recording start, recording end (both μs since Epoch) and file size in Bytes.
     -->
     <method name="LookupByEdge">
       <arg name="edgeId" direction="in" type="s"/>
@@ -53,10 +62,13 @@
 
     <!--
     Url:
-    @edgeId:          an unique id of edge
-    @fileId:          an unique id of file
+    @edgeId:          a unique ID of an edge device
+    @fileId:          a unique ID of a recording file
 
-    Get the URL of a file
+    @url:             URL using which the recording can be downloaded from the
+                      embedded HTTP server.  
+
+    Gets the URL of a file.
     -->
     <method name="Url">
       <arg name="edgeId" direction="in" type="s"/>
