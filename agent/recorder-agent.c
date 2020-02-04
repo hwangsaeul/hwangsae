@@ -301,8 +301,9 @@ gchar_compare (gconstpointer a, gconstpointer b)
 }
 
 static gchar *
-get_records (gchar * recording_dir, gchar * arg_edge_id, gchar * arg_record_id,
-    gint64 arg_from, gint64 arg_to, GVariantBuilder * builder)
+get_records (const gchar * recording_dir, gchar * arg_edge_id,
+    gchar * arg_record_id, gint64 arg_from, gint64 arg_to,
+    GVariantBuilder * builder)
 {
   g_autoptr (GDir) dir = NULL;
   g_autoptr (GError) error = NULL;
@@ -407,7 +408,6 @@ hwangsae_recorder_agent_recorder_interface_handle_lookup_by_record
 
 {
   HwangsaeRecorderAgent *self = (HwangsaeRecorderAgent *) user_data;
-  g_autofree gchar *recording_dir = NULL;
   g_autofree gchar *edge_id = NULL;
   g_autoptr (GVariantBuilder) builder = NULL;
   GVariant *records = NULL;
@@ -417,12 +417,10 @@ hwangsae_recorder_agent_recorder_interface_handle_lookup_by_record
   g_debug
       ("hwangsae_recorder_agent_recorder_interface_handle_lookup_by_record");
 
-  recording_dir = g_strdup (priv->recording_dir);
-
   builder = g_variant_builder_new (G_VARIANT_TYPE ("a(sxxx)"));
 
-  edge_id = get_records (recording_dir, NULL, arg_record_id, arg_from, arg_to,
-      builder);
+  edge_id = get_records (priv->recording_dir, NULL, arg_record_id, arg_from,
+      arg_to, builder);
 
   records = g_variant_builder_end (builder);
 
@@ -442,7 +440,6 @@ hwangsae_recorder_agent_recorder_interface_handle_lookup_by_edge
 
 {
   HwangsaeRecorderAgent *self = (HwangsaeRecorderAgent *) user_data;
-  g_autofree gchar *recording_dir = NULL;
   g_autofree gchar *edge_id = NULL;
   g_autoptr (GVariantBuilder) builder = NULL;
   GVariant *records = NULL;
@@ -452,12 +449,10 @@ hwangsae_recorder_agent_recorder_interface_handle_lookup_by_edge
 
   g_debug ("hwangsae_recorder_agent_recorder_interface_handle_lookup_by_edge");
 
-  recording_dir = g_strdup (priv->recording_dir);
-
   builder = g_variant_builder_new (G_VARIANT_TYPE ("a(ssxxx)"));
 
-  edge_id = get_records (recording_dir, arg_edge_id, NULL, arg_from, arg_to,
-      builder);
+  edge_id = get_records (priv->recording_dir, arg_edge_id, NULL, arg_from,
+      arg_to, builder);
 
   records = g_variant_builder_end (builder);
 
