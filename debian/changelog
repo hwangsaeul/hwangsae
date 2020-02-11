@@ -1,3 +1,13 @@
+hwangsae (0.10.1-0h8l0) unstable; urgency=medium
+
+  [ Jakub Adam ]
+  * recorder-agent: fix wrong HTTP server base directory
+  * Update .gitignore
+  * recorder-agent: refactor get_records()
+  * dbus: Improve documentation of some recorder methods
+
+ -- Justin Kim <jeongseok.kim@sk.com>  Tue, 11 Feb 2020 14:23:06 +0900
+
 hwangsae (0.10.0-0h8l4) unstable; urgency=medium
 
   [ Jeongseok Kim ]
