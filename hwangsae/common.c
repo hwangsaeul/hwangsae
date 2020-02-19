@@ -75,20 +75,11 @@ hwangsae_common_get_local_ip (void)
 GSettings *
 hwangsae_common_gsettings_new (const gchar * schema_id)
 {
-  if (glib_check_version (2, 60, 5) && getppid () == 1) {
-    /* Workaround GLib bug where keyfile GSettings backend wasn't registered. */
-    g_autoptr (GSettingsBackend) backend = NULL;
-    g_autofree char *filename = NULL;
+  g_autoptr (GSettingsBackend) backend = NULL;
 
-    filename = g_build_filename (g_get_user_config_dir (), "glib-2.0",
-        "settings", "keyfile", NULL);
+  backend = g_keyfile_settings_backend_new ("/etc/hwangsaeul.conf", "/", NULL);
 
-    backend = g_keyfile_settings_backend_new (filename, "/", NULL);
-
-    return g_settings_new_with_backend (schema_id, backend);
-  }
-
-  return g_settings_new (schema_id);
+  return g_settings_new_with_backend (schema_id, backend);
 }
 
 gboolean
