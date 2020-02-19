@@ -1,3 +1,9 @@
+hwangsae (0.10.2-0h8l0) unstable; urgency=medium
+
+  * common: load common configuration
+
+ -- Justin Kim <jeongseok.kim@sk.com>  Wed, 19 Feb 2020 20:54:10 +0900
+
 hwangsae (0.10.1-0h8l0) unstable; urgency=medium
 
   [ Jakub Adam ]
