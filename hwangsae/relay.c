@@ -363,12 +363,6 @@ hwangsae_relay_accept_sink (HwangsaeRelay * self, SRTSOCKET sock,
   return 0;
 }
 
-static gboolean
-_find_first_value (gpointer key, gpointer value, gpointer user_data)
-{
-  return TRUE;
-}
-
 static gint
 hwangsae_relay_accept_source (HwangsaeRelay * self, SRTSOCKET sock,
     gint hs_version, const struct sockaddr *peeraddr, const gchar * stream_id)
@@ -385,18 +379,15 @@ hwangsae_relay_accept_source (HwangsaeRelay * self, SRTSOCKET sock,
 
   _parse_stream_id (stream_id, NULL, &resource);
 
+  if (!resource) {
+    // Source socket must specify ID of the sink stream it wants to receive.
+    g_debug ("Rejecting source %d. No Resource Name found in Stream ID.", sock);
+    return -1;
+  }
+
   g_debug ("Accepting source %d", sock);
 
-  if (resource) {
-    sink = g_hash_table_lookup (self->username_sink_map, resource);
-  } else {
-    /*
-     * Pick the first available sink.
-     * TODO: Reject sources without 'r' key in Stream ID.
-     */
-    sink =
-        g_hash_table_find (self->srtsocket_sink_map, _find_first_value, NULL);
-  }
+  sink = g_hash_table_lookup (self->username_sink_map, resource);
 
   if (!sink) {
     /* Reject the attempt to connect an unknown sink. */
