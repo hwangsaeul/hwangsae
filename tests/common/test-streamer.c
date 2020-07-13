@@ -31,9 +31,7 @@ struct _HwangsaeTestStreamer
   gchar *username;
   GaeguliVideoResolution resolution;
 
-  GaeguliFifoTransmit *transmit;
   GaeguliPipeline *pipeline;
-  guint target_id;
 
   gboolean should_stream;
   GThread *streaming_thread;
@@ -58,7 +56,7 @@ hwangsae_test_streamer_thread_func (HwangsaeTestStreamer * self)
   g_autoptr (GstUri) uri = NULL;
   const gchar *mode_str;
   GaeguliSRTMode mode = GAEGULI_SRT_MODE_UNKNOWN;
-  guint transmit_id;
+  guint target_id;
 
   g_main_context_push_thread_default (context);
 
@@ -72,23 +70,16 @@ hwangsae_test_streamer_thread_func (HwangsaeTestStreamer * self)
   }
   g_assert (mode != GAEGULI_SRT_MODE_UNKNOWN);
 
-  transmit_id = gaeguli_fifo_transmit_start_full (self->transmit,
-      gst_uri_get_host (uri), gst_uri_get_port (uri), mode, self->username,
-      &error);
+  target_id = gaeguli_pipeline_add_srt_target_full (self->pipeline,
+      GAEGULI_VIDEO_CODEC_H264, self->resolution, 30, 2048000,
+      self->uri, self->username, &error);
   g_assert_no_error (error);
 
-  if (!self->target_id) {
-    self->target_id = gaeguli_pipeline_add_fifo_target_full (self->pipeline,
-        GAEGULI_VIDEO_CODEC_H264, self->resolution, 30, 2048000,
-        gaeguli_fifo_transmit_get_fifo (self->transmit), &error);
-    g_assert_no_error (error);
-  }
-
   while (self->should_stream) {
-    g_main_context_iteration (context, TRUE);
+    g_main_context_iteration (context, FALSE);
   }
 
-  gaeguli_fifo_transmit_stop (self->transmit, transmit_id, &error);
+  gaeguli_pipeline_remove_target (self->pipeline, target_id, &error);
   g_assert_no_error (error);
 
   return TRUE;
@@ -121,9 +112,8 @@ hwangsae_test_streamer_pause (HwangsaeTestStreamer * self)
 void
 hwangsae_test_streamer_stop (HwangsaeTestStreamer * self)
 {
-  gaeguli_pipeline_stop (self->pipeline);
-  self->target_id = 0;
   hwangsae_test_streamer_pause (self);
+  gaeguli_pipeline_stop (self->pipeline);
 }
 
 static void
@@ -131,7 +121,6 @@ hwangsae_test_streamer_init (HwangsaeTestStreamer * self)
 {
   self->uri = g_strdup ("srt://127.0.0.1:8888?mode=listener");
   self->username = g_strdup_printf ("HwangsaeTestStreamer %p", self);
-  self->transmit = gaeguli_fifo_transmit_new ();
   self->pipeline = gaeguli_pipeline_new_full (GAEGULI_VIDEO_SOURCE_VIDEOTESTSRC,
       NULL, GAEGULI_ENCODING_METHOD_GENERAL);
 
@@ -179,7 +168,6 @@ hwangsae_test_streamer_dispose (GObject * object)
 
   g_clear_pointer (&self->uri, g_free);
   g_clear_pointer (&self->username, g_free);
-  g_clear_object (&self->transmit);
   g_clear_object (&self->pipeline);
 
   G_OBJECT_CLASS (hwangsae_test_streamer_parent_class)->dispose (object);
