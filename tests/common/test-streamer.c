@@ -120,7 +120,7 @@ static void
 hwangsae_test_streamer_init (HwangsaeTestStreamer * self)
 {
   self->uri = g_strdup ("srt://127.0.0.1:8888?mode=listener");
-  self->username = g_strdup_printf ("HwangsaeTestStreamer %p", self);
+  self->username = g_strdup_printf ("HwangsaeTestStreamer_%p", self);
   self->pipeline = gaeguli_pipeline_new_full (GAEGULI_VIDEO_SOURCE_VIDEOTESTSRC,
       NULL, GAEGULI_ENCODING_METHOD_GENERAL);
 
