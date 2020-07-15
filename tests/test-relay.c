@@ -24,6 +24,9 @@
 #include <gaeguli/gaeguli.h>
 #include <gst/pbutils/gstdiscoverer.h>
 
+static gchar *build_source_uri (HwangsaeTestStreamer * streamer,
+    HwangsaeRelay * relay);
+
 static void
 test_relay_instance (void)
 {
@@ -137,10 +140,12 @@ test_1_to_n (void)
 {
   g_autoptr (HwangsaeTestStreamer) streamer = hwangsae_test_streamer_new ();
   g_autoptr (HwangsaeRelay) relay = hwangsae_relay_new ();
+  g_autofree gchar *source_uri = NULL;
   RelayTestData data1 = { 0 };
   RelayTestData data2 = { 0 };
 
-  data1.source_uri = data2.source_uri = hwangsae_relay_get_source_uri (relay);
+  source_uri = build_source_uri (streamer, relay);
+  data1.source_uri = data2.source_uri = source_uri;
   data1.resolution = data2.resolution = GAEGULI_VIDEO_RESOLUTION_640X480;
 
   hwangsae_test_streamer_set_uri (streamer,
