@@ -35,6 +35,7 @@ jobs:
                   gstreamer1.0-plugins-bad \
                   gstreamer1.0-plugins-ugly \
                   libsrt-dev \
+                  libsoup2.4-dev \
                   libjson-glib-dev \
                   meson ninja-build 
       - name: Compile
