@@ -1,6 +1,7 @@
 /**
- *  Copyright 2019 SK Telecom Co., Ltd.
+ *  Copyright 2019-2020 SK Telecom Co., Ltd.
  *    Author: Jakub Adam <jakub.adam@collabora.com>
+ *            Jeongseok Kim <jeongseok.kim@sk.com>
  *
  *  Licensed under the Apache License, Version 2.0 (the "License");
  *  you may not use this file except in compliance with the License.
@@ -61,8 +62,6 @@ struct _HwangsaeRelay
   GObject parent;
 
   GMutex lock;
-
-  GSettings *settings;
 
   guint sink_port;
   guint source_port;
@@ -142,7 +141,6 @@ hwangsae_relay_finalize (GObject * object)
   g_hash_table_destroy (self->username_sink_map);
 
   g_clear_handle_id (&self->poll_id, srt_epoll_release);
-  g_clear_object (&self->settings);
 
   if (g_atomic_int_dec_and_test (&hwangsae_relay_init_refcnt)) {
     g_debug ("Cleaning up SRT");
@@ -483,16 +481,6 @@ hwangsae_relay_init (HwangsaeRelay * self)
 
   g_mutex_init (&self->lock);
 
-  self->settings =
-      hwangsae_common_gsettings_new ("org.hwangsaeul.hwangsae.relay");
-
-  g_settings_bind (self->settings, "sink-port", self, "sink-port",
-      G_SETTINGS_BIND_DEFAULT);
-  g_settings_bind (self->settings, "source-port", self, "source-port",
-      G_SETTINGS_BIND_DEFAULT);
-  g_settings_bind (self->settings, "external-ip", self, "external-ip",
-      G_SETTINGS_BIND_DEFAULT);
-
   self->poll_id = srt_epoll_create ();
 
   self->sink_listen_sock = _srt_open_listen_sock (self->sink_port);
@@ -518,9 +506,11 @@ hwangsae_relay_init (HwangsaeRelay * self)
 }
 
 HwangsaeRelay *
-hwangsae_relay_new (void)
+hwangsae_relay_new (const gchar * external_ip, guint sink_port,
+    guint source_port)
 {
-  return g_object_new (HWANGSAE_TYPE_RELAY, NULL);
+  return g_object_new (HWANGSAE_TYPE_RELAY, "external-ip", external_ip,
+      "sink-port", sink_port, "source-port", source_port, NULL);
 }
 
 static gchar *
