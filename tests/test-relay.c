@@ -31,7 +31,7 @@ static void
 test_relay_instance (void)
 {
   guint sink_port, source_port;
-  g_autoptr (HwangsaeRelay) relay = hwangsae_relay_new ();
+  g_autoptr (HwangsaeRelay) relay = hwangsae_relay_new ("", 8888, 9999);
 
   g_assert_nonnull (relay);
 
@@ -46,7 +46,8 @@ static void
 test_external_ip (void)
 {
   static const gchar *EXTERNAL_IP = "10.1.2.3";
-  g_autoptr (HwangsaeRelay) relay = hwangsae_relay_new ();
+  g_autoptr (HwangsaeRelay) relay =
+      hwangsae_relay_new (EXTERNAL_IP, 8888, 9999);
   g_autofree gchar *sink_uri = NULL;
   g_autofree gchar *source_uri = NULL;
   guint sink_port, source_port;
@@ -139,7 +140,7 @@ static void
 test_1_to_n (void)
 {
   g_autoptr (HwangsaeTestStreamer) streamer = hwangsae_test_streamer_new ();
-  g_autoptr (HwangsaeRelay) relay = hwangsae_relay_new ();
+  g_autoptr (HwangsaeRelay) relay = hwangsae_relay_new (NULL, 8888, 9999);
   g_autofree gchar *source_uri = NULL;
   RelayTestData data1 = { 0 };
   RelayTestData data2 = { 0 };
@@ -182,7 +183,7 @@ test_m_to_n (void)
 {
   g_autoptr (HwangsaeTestStreamer) streamer1 = hwangsae_test_streamer_new ();
   g_autoptr (HwangsaeTestStreamer) streamer2 = hwangsae_test_streamer_new ();
-  g_autoptr (HwangsaeRelay) relay = hwangsae_relay_new ();
+  g_autoptr (HwangsaeRelay) relay = hwangsae_relay_new (NULL, 8888, 9999);
   g_autofree gchar *source_uri1 = NULL;
   g_autofree gchar *source_uri2 = NULL;
   RelayTestData data1 = { 0 };

@@ -40,12 +40,17 @@ G_DECLARE_FINAL_TYPE            (HwangsaeRelay, hwangsae_relay, HWANGSAE, RELAY,
 
 /**
  * hwangsae_relay_new:
+ * @external_ip: an external ip address
+ * @sink_port: an inbound network port
+ * @source_port: an outbound network port
  *
  * Creates a new HwangsaeRelay object
  *
  * Returns: the newly created object
  */
-HwangsaeRelay          *hwangsae_relay_new              (void);
+HwangsaeRelay          *hwangsae_relay_new              (const gchar   *external_ip,
+                                                         guint          sink_port,
+                                                         guint          source_port);
 
 /**
  * hwangsae_relay_get_sink_uri:
