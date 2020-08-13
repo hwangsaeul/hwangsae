@@ -1,3 +1,9 @@
+hwangsae (0.11.0-0h8l0) UNRELEASED; urgency=medium
+
+  * Break ABI
+
+ -- Justin Kim <jeongseok.kim@sk.com>  Thu, 13 Aug 2020 08:27:12 +0000
+
 hwangsae (0.10.2-0h8l0) unstable; urgency=medium
 
   * common: load common configuration
