@@ -58,8 +58,6 @@ hwangsaeul_req_version = '>= 0.9.0'
 
 gaeguli_dep = dependency('gaeguli-1.0', version: hwangsaeul_req_version,
     fallback: ['gaeguli', 'libgaeguli_dep'])
-chamge_dep = dependency('chamge-1.0', version: hwangsaeul_req_version,
-    fallback: ['chamge', 'libchamge_dep'])
 
 gnome = import('gnome')
 
@@ -69,7 +67,7 @@ hwangsae_doc_incs = include_directories('hwangsae')
 common_ldflags = [ ]
 
 subdir('hwangsae')
-subdir('agent')
+#subdir('agent')
 subdir('tools')
 subdir('tests')
 subdir('doc')

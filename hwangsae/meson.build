@@ -60,7 +60,7 @@ libhwangsae = library(
 if meson.version().version_compare('>= 0.48.2')
 
   pkg.generate(libhwangsae,
-    libraries : [ gaeguli_dep, chamge_dep, libsrt_dep ],
+    libraries : [ gaeguli_dep, libsrt_dep ],
     name : meson.project_name(),
     description : 'A SRT Relay and Recording Library',
     filebase : hwangsae_api_name,
@@ -78,7 +78,6 @@ else
     filebase: hwangsae_api_name,
     requires: [
       'gaeguli-1.0', 
-      'chamge-1.0',
       'srt'
     ],
     requires_private: [
