@@ -404,6 +404,19 @@ _relay_main (gpointer data)
   SRTSOCKET readfds[MAX_EPOLL_SRT_SOCKETS];
   gchar buf[1400];
 
+  self->sink_listen_sock = _srt_open_listen_sock (self->sink_port);
+  srt_listen_callback (self->sink_listen_sock,
+      (srt_listen_callback_fn *) hwangsae_relay_accept_sink, self);
+  srt_epoll_add_usock (self->poll_id, self->sink_listen_sock, &SRT_POLL_EVENTS);
+
+  g_debug ("URI for sink connection is %s", hwangsae_relay_get_sink_uri (self));
+
+  self->source_listen_sock = _srt_open_listen_sock (self->source_port);
+  srt_listen_callback (self->source_listen_sock,
+      (srt_listen_callback_fn *) hwangsae_relay_accept_source, self);
+  srt_epoll_add_usock (self->poll_id, self->source_listen_sock,
+      &SRT_POLL_EVENTS);
+
   while (self->run_relay_thread) {
     gint rnum = G_N_ELEMENTS (readfds);
 
@@ -483,19 +496,6 @@ hwangsae_relay_init (HwangsaeRelay * self)
 
   self->poll_id = srt_epoll_create ();
 
-  self->sink_listen_sock = _srt_open_listen_sock (self->sink_port);
-  srt_listen_callback (self->sink_listen_sock,
-      (srt_listen_callback_fn *) hwangsae_relay_accept_sink, self);
-  srt_epoll_add_usock (self->poll_id, self->sink_listen_sock, &SRT_POLL_EVENTS);
-
-  g_debug ("URI for sink connection is %s", hwangsae_relay_get_sink_uri (self));
-
-  self->source_listen_sock = _srt_open_listen_sock (self->source_port);
-  srt_listen_callback (self->source_listen_sock,
-      (srt_listen_callback_fn *) hwangsae_relay_accept_source, self);
-  srt_epoll_add_usock (self->poll_id, self->source_listen_sock,
-      &SRT_POLL_EVENTS);
-
   self->srtsocket_sink_map = g_hash_table_new_full (g_int_hash, g_int_equal,
       NULL, (GDestroyNotify) _sink_connection_free);
   self->username_sink_map = g_hash_table_new (g_str_hash, g_str_equal);
@@ -519,6 +519,7 @@ hwangsae_relay_make_uri (HwangsaeRelay * self, guint port)
   g_autofree gchar *local_ip = NULL;
   const gchar *ip;
 
+  LOCK_RELAY;
   if (self->external_ip) {
     ip = self->external_ip;
   } else {
