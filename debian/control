@@ -6,8 +6,6 @@ Build-Depends: debhelper (>= 10~),
   pkg-config,
   libglib2.0-dev,
   libjson-glib-dev,
-  librabbitmq-dev,
-  libchamge-dev,
   libgaeguli-dev,
   libsrt-dev,
   libsoup2.4-dev,
@@ -22,14 +20,14 @@ Vcs-Git: https://github.com/hwangsaeul/hwangsae.git
 
 Package: libhwangsae1
 Architecture: any
-Depends: libgaeguli1, libchamge1, ${shlibs:Depends}, ${misc:Depends}
+Depends: libgaeguli1, ${shlibs:Depends}, ${misc:Depends}
 Description: SRT relay and recording API
  A set of library for SRT relay and recording.
 
 Package: libhwangsae-dev
 Section: libdevel
 Architecture: any
-Depends: libhwangsae1 (= ${binary:Version}), libchamge-dev, libsoup2.4-dev, ${misc:Depends}
+Depends: libhwangsae1 (= ${binary:Version}), libsoup2.4-dev, ${misc:Depends}
 Description: SRT relay and recording API
  A set of library for SRT relay and recording.
  .
