@@ -19,7 +19,9 @@
 
 #include "relay.h"
 #include "common.h"
+#include "enumtypes.h"
 
+#include <netinet/in.h>
 #include <srt/srt.h>
 #include <gio/gio.h>
 
@@ -97,6 +99,14 @@ enum
   PROP_EXTERNAL_IP,
   PROP_LAST
 };
+
+enum
+{
+  SIG_CALLER_REJECTED,
+  LAST_SIGNAL
+};
+
+static guint signals[LAST_SIGNAL] = { 0 };
 
 typedef struct
 {
@@ -288,6 +298,12 @@ hwangsae_relay_class_init (HwangsaeRelayClass * klass)
           "When set, the relay will use this IP address in its source and sink "
           "URIs. Otherwise, the first available non-loopback IP is used",
           NULL, G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS));
+
+  signals[SIG_CALLER_REJECTED] =
+      g_signal_new ("caller-rejected", G_TYPE_FROM_CLASS (klass),
+      G_SIGNAL_RUN_LAST, 0, NULL, NULL, NULL, G_TYPE_NONE, 4,
+      HWANGSAE_TYPE_CALLER_DIRECTION, G_TYPE_SOCKET_ADDRESS, G_TYPE_STRING,
+      G_TYPE_STRING);
 }
 
 static void
@@ -330,6 +346,32 @@ _parse_stream_id (const gchar * stream_id, gchar ** username, gchar ** resource)
   g_strfreev (keys);
 }
 
+static void
+hwangsae_relay_emit_caller_rejected (HwangsaeRelay * self,
+    HwangsaeCallerDirection direction, const struct sockaddr *peeraddr,
+    const gchar * username, const gchar * resource)
+{
+  g_autoptr (GSocketAddress) addr = NULL;
+  gsize peeraddr_len;
+
+  switch (peeraddr->sa_family) {
+    case AF_INET:
+      peeraddr_len = sizeof (struct sockaddr_in);
+      break;
+    case AF_INET6:
+      peeraddr_len = sizeof (struct sockaddr_in6);
+      break;
+    default:
+      g_warning ("Unsupported address family %d", peeraddr->sa_family);
+      return;
+  }
+
+  addr = g_socket_address_new_from_native ((gpointer) peeraddr, peeraddr_len);
+
+  g_signal_emit (self, signals[SIG_CALLER_REJECTED], 0, direction, addr,
+      username, resource);
+}
+
 static gint
 hwangsae_relay_accept_sink (HwangsaeRelay * self, SRTSOCKET sock,
     gint hs_version, const struct sockaddr *peeraddr, const gchar * stream_id)
@@ -337,31 +379,34 @@ hwangsae_relay_accept_sink (HwangsaeRelay * self, SRTSOCKET sock,
   gchar *username = NULL;
   SinkConnection *sink;
 
-  LOCK_RELAY;
+  {
+    LOCK_RELAY;
 
-  _parse_stream_id (stream_id, &username, NULL);
-  if (!username) {
-    // Sink socket must have username in its Stream ID.
-    return -1;
+    _parse_stream_id (stream_id, &username, NULL);
+    if (!username || g_hash_table_contains (self->username_sink_map, username)) {
+      /* Sink socket must have username in its Stream ID and not been already
+       * registered. */
+      goto reject;
+    }
+
+    g_debug ("Accepting sink %d username: %s", sock, username);
+
+    sink = g_new0 (SinkConnection, 1);
+    sink->socket = sock;
+    sink->username = username;
+
+    g_hash_table_insert (self->srtsocket_sink_map, &sink->socket, sink);
+    g_hash_table_insert (self->username_sink_map, sink->username, sink);
+
+    srt_epoll_add_usock (self->poll_id, sock, &SRT_POLL_EVENTS);
   }
-
-  if (g_hash_table_contains (self->username_sink_map, username)) {
-    /* Sink already registered. */
-    return -1;
-  }
-
-  g_debug ("Accepting sink %d username: %s", sock, username);
-
-  sink = g_new0 (SinkConnection, 1);
-  sink->socket = sock;
-  sink->username = username;
-
-  g_hash_table_insert (self->srtsocket_sink_map, &sink->socket, sink);
-  g_hash_table_insert (self->username_sink_map, sink->username, sink);
-
-  srt_epoll_add_usock (self->poll_id, sock, &SRT_POLL_EVENTS);
 
   return 0;
+
+reject:
+  hwangsae_relay_emit_caller_rejected (self, HWANGSAE_CALLER_DIRECTION_SINK,
+      peeraddr, username, NULL);
+  return -1;
 }
 
 static gint
@@ -371,33 +416,41 @@ hwangsae_relay_accept_source (HwangsaeRelay * self, SRTSOCKET sock,
   g_autofree gchar *resource = NULL;
   SinkConnection *sink;
 
-  LOCK_RELAY;
+  {
+    LOCK_RELAY;
 
-  if (g_hash_table_size (self->srtsocket_sink_map) == 0) {
-    /* We have no sinks. */
-    return -1;
+    if (g_hash_table_size (self->srtsocket_sink_map) == 0) {
+      /* We have no sinks. */
+      goto reject;
+    }
+
+    _parse_stream_id (stream_id, NULL, &resource);
+
+    if (!resource) {
+      // Source socket must specify ID of the sink stream it wants to receive.
+      g_debug ("Rejecting source %d. No Resource Name found in Stream ID.",
+          sock);
+      goto reject;
+    }
+
+    g_debug ("Accepting source %d", sock);
+
+    sink = g_hash_table_lookup (self->username_sink_map, resource);
+
+    if (!sink) {
+      /* Reject the attempt to connect an unknown sink. */
+      goto reject;
+    }
+
+    sink->sources = g_slist_append (sink->sources, GINT_TO_POINTER (sock));
   }
-
-  _parse_stream_id (stream_id, NULL, &resource);
-
-  if (!resource) {
-    // Source socket must specify ID of the sink stream it wants to receive.
-    g_debug ("Rejecting source %d. No Resource Name found in Stream ID.", sock);
-    return -1;
-  }
-
-  g_debug ("Accepting source %d", sock);
-
-  sink = g_hash_table_lookup (self->username_sink_map, resource);
-
-  if (!sink) {
-    /* Reject the attempt to connect an unknown sink. */
-    return -1;
-  }
-
-  sink->sources = g_slist_append (sink->sources, GINT_TO_POINTER (sock));
 
   return 0;
+reject:
+  hwangsae_relay_emit_caller_rejected (self, HWANGSAE_CALLER_DIRECTION_SRC,
+      peeraddr, NULL, resource);
+
+  return -1;
 }
 
 static gpointer

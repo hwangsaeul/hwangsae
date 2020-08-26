@@ -52,4 +52,9 @@ typedef enum {
   HWANGSAE_TRANSMUXER_ERROR_MISSING_FILE,
 } HwangsaeTransmuxerError;
 
+typedef enum {
+  HWANGSAE_CALLER_DIRECTION_SINK,
+  HWANGSAE_CALLER_DIRECTION_SRC,
+} HwangsaeCallerDirection;
+
 #endif // __HWANGSAE_TYPES_H__
