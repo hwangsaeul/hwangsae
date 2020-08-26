@@ -18,10 +18,12 @@
  *
  */
 
+#include "hwangsae/common.h"
 #include "hwangsae/hwangsae.h"
 #include "common/test-streamer.h"
 
 #include <gaeguli/gaeguli.h>
+#include <gio/gio.h>
 #include <gst/pbutils/gstdiscoverer.h>
 
 static gchar *build_source_uri (HwangsaeTestStreamer * streamer,
@@ -212,6 +214,47 @@ test_m_to_n (void)
   }
 }
 
+static void
+_on_sink_rejected (HwangsaeRelay * relay, HwangsaeCallerDirection direction,
+    GInetSocketAddress * addr, const gchar * username, const gchar * resource,
+    gpointer data)
+{
+  GInetAddress *ip = NULL;
+  g_autofree gchar *ip_str = NULL;
+  g_autofree gchar *local_ip_str = NULL;
+
+  g_assert_cmpint (direction, ==, HWANGSAE_CALLER_DIRECTION_SINK);
+  g_assert_null (username);
+
+  ip = g_inet_socket_address_get_address (addr);
+  ip_str = g_inet_address_to_string (ip);
+
+  local_ip_str = hwangsae_common_get_local_ip ();
+
+  g_assert_cmpstr (ip_str, ==, local_ip_str);
+
+  g_main_loop_quit (data);
+}
+
+static void
+test_reject_sink (void)
+{
+  g_autoptr (GMainLoop) loop = g_main_loop_new (NULL, FALSE);
+  g_autoptr (HwangsaeTestStreamer) streamer = hwangsae_test_streamer_new ();
+  g_autoptr (HwangsaeRelay) relay = hwangsae_relay_new (NULL, 8888, 9999);
+
+  hwangsae_test_streamer_set_uri (streamer,
+      hwangsae_relay_get_sink_uri (relay));
+  g_object_set (streamer, "username", NULL, NULL);
+
+  g_signal_connect (relay, "caller-rejected", (GCallback) _on_sink_rejected,
+      loop);
+
+  hwangsae_test_streamer_start (streamer);
+
+  g_main_loop_run (loop);
+}
+
 int
 main (int argc, char *argv[])
 {
@@ -224,6 +267,7 @@ main (int argc, char *argv[])
   g_test_add_func ("/hwangsae/relay-1-to-n", test_1_to_n);
   g_test_add_func ("/hwangsae/relay-m-to-n", test_m_to_n);
   g_test_add_func ("/hwangsae/relay-external-ip", test_external_ip);
+  g_test_add_func ("/hwangsae/relay-reject-sink", test_reject_sink);
 
   return g_test_run ();
 }
