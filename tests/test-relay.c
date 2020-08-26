@@ -255,6 +255,47 @@ test_reject_sink (void)
   g_main_loop_run (loop);
 }
 
+static void
+_on_source_rejected (HwangsaeRelay * relay, HwangsaeCallerDirection direction,
+    GInetSocketAddress * addr, const gchar * username, const gchar * resource,
+    gpointer data)
+{
+  GInetAddress *ip = NULL;
+  g_autofree gchar *ip_str = NULL;
+
+  g_assert_cmpint (direction, ==, HWANGSAE_CALLER_DIRECTION_SRC);
+  g_assert_null (resource);
+
+  ip = g_inet_socket_address_get_address (addr);
+  ip_str = g_inet_address_to_string (ip);
+
+  g_assert_cmpstr (ip_str, ==, "127.0.0.1");
+
+  g_main_loop_quit (data);
+}
+
+static void
+test_reject_source (void)
+{
+  g_autoptr (GMainLoop) loop = g_main_loop_new (NULL, FALSE);
+  g_autoptr (HwangsaeRelay) relay = hwangsae_relay_new (NULL, 8888, 9999);
+  g_autoptr (GstElement) receiver = NULL;
+  g_autoptr (GError) error = NULL;
+
+  g_signal_connect (relay, "caller-rejected", (GCallback) _on_source_rejected,
+      loop);
+
+  receiver = gst_parse_launch ("srtsrc uri=srt://127.0.0.1:9999?mode=caller ! "
+      "fakesink", &error);
+  g_assert_no_error (error);
+
+  gst_element_set_state (receiver, GST_STATE_PLAYING);
+
+  g_main_loop_run (loop);
+
+  gst_element_set_state (receiver, GST_STATE_NULL);
+}
+
 int
 main (int argc, char *argv[])
 {
@@ -268,6 +309,7 @@ main (int argc, char *argv[])
   g_test_add_func ("/hwangsae/relay-m-to-n", test_m_to_n);
   g_test_add_func ("/hwangsae/relay-external-ip", test_external_ip);
   g_test_add_func ("/hwangsae/relay-reject-sink", test_reject_sink);
+  g_test_add_func ("/hwangsae/relay-reject-source", test_reject_source);
 
   return g_test_run ();
 }
