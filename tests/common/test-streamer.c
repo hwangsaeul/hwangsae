@@ -152,6 +152,10 @@ hwangsae_test_streamer_set_property (GObject * object, guint prop_id,
     case PROP_RESOLUTION:
       self->resolution = g_value_get_enum (value);
       break;
+    case PROP_USERNAME:
+      g_clear_pointer (&self->username, g_free);
+      self->username = g_value_dup_string (value);
+      break;
     default:
       G_OBJECT_WARN_INVALID_PROPERTY_ID (object, prop_id, pspec);
   }
@@ -189,7 +193,7 @@ hwangsae_test_streamer_class_init (HwangsaeTestStreamerClass * klass)
 
   g_object_class_install_property (gobject_class, PROP_USERNAME,
       g_param_spec_string ("username", "SRT username", "SRT username",
-          NULL, G_PARAM_READABLE | G_PARAM_STATIC_STRINGS));
+          NULL, G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS));
 }
 
 HwangsaeTestStreamer *
