@@ -114,6 +114,8 @@ static SrtParam srt_params[] = {
   {NULL, -1, -1},
 };
 
+static void hwangsae_relay_constructed (GObject * object);
+
 static void
 hwangsae_relay_remove_sink (HwangsaeRelay * self, SinkConnection * sink)
 {
@@ -266,6 +268,7 @@ hwangsae_relay_class_init (HwangsaeRelayClass * klass)
 {
   GObjectClass *gobject_class = G_OBJECT_CLASS (klass);
 
+  gobject_class->constructed = hwangsae_relay_constructed;
   gobject_class->set_property = hwangsae_relay_set_property;
   gobject_class->get_property = hwangsae_relay_get_property;
   gobject_class->finalize = hwangsae_relay_finalize;
@@ -273,12 +276,12 @@ hwangsae_relay_class_init (HwangsaeRelayClass * klass)
   g_object_class_install_property (gobject_class, PROP_SINK_PORT,
       g_param_spec_uint ("sink-port", "SRT Binding port (from) ",
           "SRT Binding port (from)", 0, G_MAXUINT, 8888,
-          G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS));
+          G_PARAM_READWRITE | G_PARAM_CONSTRUCT_ONLY | G_PARAM_STATIC_STRINGS));
 
   g_object_class_install_property (gobject_class, PROP_SOURCE_PORT,
       g_param_spec_uint ("source-port", "SRT Binding port (to) ",
           "SRT Binding port (to)", 0, G_MAXUINT, 9999,
-          G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS));
+          G_PARAM_READWRITE | G_PARAM_CONSTRUCT_ONLY | G_PARAM_STATIC_STRINGS));
 
   g_object_class_install_property (gobject_class, PROP_EXTERNAL_IP,
       g_param_spec_string ("external-ip", "Relay external IP",
@@ -499,8 +502,15 @@ hwangsae_relay_init (HwangsaeRelay * self)
   self->srtsocket_sink_map = g_hash_table_new_full (g_int_hash, g_int_equal,
       NULL, (GDestroyNotify) _sink_connection_free);
   self->username_sink_map = g_hash_table_new (g_str_hash, g_str_equal);
+}
+
+static void
+hwangsae_relay_constructed (GObject * object)
+{
+  HwangsaeRelay *self = HWANGSAE_RELAY (object);
 
   LOCK_RELAY;
+
   self->run_relay_thread = TRUE;
   self->relay_thread = g_thread_new ("HwangsaeRelay", _relay_main, self);
 }
