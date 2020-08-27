@@ -147,6 +147,8 @@ test_1_to_n (void)
   RelayTestData data1 = { 0 };
   RelayTestData data2 = { 0 };
 
+  g_object_set (relay, "authentication", TRUE, NULL);
+
   source_uri = build_source_uri (streamer, relay);
   data1.source_uri = data2.source_uri = source_uri;
   data1.resolution = data2.resolution = GAEGULI_VIDEO_RESOLUTION_640X480;
@@ -190,6 +192,8 @@ test_m_to_n (void)
   g_autofree gchar *source_uri2 = NULL;
   RelayTestData data1 = { 0 };
   RelayTestData data2 = { 0 };
+
+  g_object_set (relay, "authentication", TRUE, NULL);
 
   hwangsae_test_streamer_set_uri (streamer1,
       hwangsae_relay_get_sink_uri (relay));
@@ -243,6 +247,8 @@ test_reject_sink (void)
   g_autoptr (HwangsaeTestStreamer) streamer = hwangsae_test_streamer_new ();
   g_autoptr (HwangsaeRelay) relay = hwangsae_relay_new (NULL, 8888, 9999);
 
+  g_object_set (relay, "authentication", TRUE, NULL);
+
   hwangsae_test_streamer_set_uri (streamer,
       hwangsae_relay_get_sink_uri (relay));
   g_object_set (streamer, "username", NULL, NULL);
@@ -282,6 +288,8 @@ test_reject_source (void)
   g_autoptr (GstElement) receiver = NULL;
   g_autoptr (GError) error = NULL;
 
+  g_object_set (relay, "authentication", TRUE, NULL);
+
   g_signal_connect (relay, "caller-rejected", (GCallback) _on_source_rejected,
       loop);
 
@@ -294,6 +302,73 @@ test_reject_source (void)
   g_main_loop_run (loop);
 
   gst_element_set_state (receiver, GST_STATE_NULL);
+}
+
+static void
+_flip_flag (HwangsaeRelay * relay, HwangsaeCallerDirection direction,
+    GInetSocketAddress * addr, const gchar * username, const gchar * resource,
+    gpointer data)
+{
+  *(gboolean *) data = TRUE;
+}
+
+static void
+test_no_auth (void)
+{
+  g_autoptr (HwangsaeRelay) relay = hwangsae_relay_new (NULL, 8888, 9999);
+  g_autoptr (HwangsaeTestStreamer) stream1 = hwangsae_test_streamer_new ();
+  g_autoptr (HwangsaeTestStreamer) stream2 = hwangsae_test_streamer_new ();
+  g_autofree gchar *source_uri = NULL;
+  gboolean stream1_accepted = FALSE;
+  gboolean stream2_rejected = FALSE;
+  RelayTestData data1 = { 0 };
+  RelayTestData data2 = { 0 };
+
+  data1.resolution = data2.resolution = GAEGULI_VIDEO_RESOLUTION_640X480;
+  data1.source_uri = data2.source_uri = source_uri =
+      build_source_uri (stream1, relay);
+
+  g_object_set (relay, "authentication", FALSE, NULL);
+
+  /* Connect first streamer. */
+
+  g_signal_connect (relay, "caller-accepted", (GCallback) _flip_flag,
+      &stream1_accepted);
+
+  g_object_set (stream1, "resolution", data1.resolution, NULL);
+  hwangsae_test_streamer_set_uri (stream1, hwangsae_relay_get_sink_uri (relay));
+  hwangsae_test_streamer_start (stream1);
+
+  while (!stream1_accepted) {
+    g_main_context_iteration (NULL, FALSE);
+  }
+
+  g_debug ("stream1 accepted");
+
+  /* Try connecting second stream. In unauthenticated mode this should fail. */
+
+  g_signal_connect (relay, "caller-rejected", (GCallback) _flip_flag,
+      &stream2_rejected);
+
+  hwangsae_test_streamer_set_uri (stream2, hwangsae_relay_get_sink_uri (relay));
+  hwangsae_test_streamer_start (stream2);
+
+  while (!stream2_rejected) {
+    g_main_context_iteration (NULL, FALSE);
+  }
+
+  g_debug ("stream2 rejected");
+
+  /* Check that two sources can be connected to the first (and only ) sink. */
+
+  g_idle_add ((GSourceFunc) validate_stream, &data1);
+  g_idle_add ((GSourceFunc) validate_stream, &data2);
+
+  while (!data1.done && !data2.done) {
+    g_main_context_iteration (NULL, FALSE);
+  }
+
+  g_debug ("Receiving stream1 validated");
 }
 
 int
@@ -310,6 +385,7 @@ main (int argc, char *argv[])
   g_test_add_func ("/hwangsae/relay-external-ip", test_external_ip);
   g_test_add_func ("/hwangsae/relay-reject-sink", test_reject_sink);
   g_test_add_func ("/hwangsae/relay-reject-source", test_reject_source);
+  g_test_add_func ("/hwangsae/relay-no-auth", test_no_auth);
 
   return g_test_run ();
 }
