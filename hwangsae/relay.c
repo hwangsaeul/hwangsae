@@ -133,7 +133,9 @@ static void hwangsae_relay_constructed (GObject * object);
 static void
 hwangsae_relay_remove_sink (HwangsaeRelay * self, SinkConnection * sink)
 {
-  g_hash_table_remove (self->username_sink_map, sink->username);
+  if (sink->username) {
+    g_hash_table_remove (self->username_sink_map, sink->username);
+  }
   g_hash_table_remove (self->srtsocket_sink_map, &sink->socket);
 }
 
@@ -402,10 +404,16 @@ hwangsae_relay_accept_sink (HwangsaeRelay * self, SRTSOCKET sock,
   {
     LOCK_RELAY;
 
-    _parse_stream_id (stream_id, &username, NULL);
-    if (!username || g_hash_table_contains (self->username_sink_map, username)) {
-      /* Sink socket must have username in its Stream ID and not been already
-       * registered. */
+    if (self->authentication) {
+      _parse_stream_id (stream_id, &username, NULL);
+      if (!username
+          || g_hash_table_contains (self->username_sink_map, username)) {
+        /* Sink socket must have username in its Stream ID and not been already
+         * registered. */
+        goto reject;
+      }
+    } else if (g_hash_table_size (self->srtsocket_sink_map) != 0) {
+      /* When authentication is off, only one sink can connect. */
       goto reject;
     }
 
@@ -416,7 +424,9 @@ hwangsae_relay_accept_sink (HwangsaeRelay * self, SRTSOCKET sock,
     sink->username = username;
 
     g_hash_table_insert (self->srtsocket_sink_map, &sink->socket, sink);
-    g_hash_table_insert (self->username_sink_map, sink->username, sink);
+    if (sink->username) {
+      g_hash_table_insert (self->username_sink_map, sink->username, sink);
+    }
 
     srt_epoll_add_usock (self->poll_id, sock, &SRT_POLL_EVENTS);
   }
@@ -434,33 +444,37 @@ hwangsae_relay_accept_source (HwangsaeRelay * self, SRTSOCKET sock,
     gint hs_version, const struct sockaddr *peeraddr, const gchar * stream_id)
 {
   g_autofree gchar *resource = NULL;
-  SinkConnection *sink;
+  SinkConnection *sink = NULL;
 
   {
     LOCK_RELAY;
 
-    if (g_hash_table_size (self->srtsocket_sink_map) == 0) {
-      /* We have no sinks. */
-      goto reject;
+    if (self->authentication) {
+      _parse_stream_id (stream_id, NULL, &resource);
+
+      if (!resource) {
+        // Source socket must specify ID of the sink stream it wants to receive.
+        g_debug ("Rejecting source %d. No Resource Name found in Stream ID.",
+            sock);
+        goto reject;
+      }
+
+      sink = g_hash_table_lookup (self->username_sink_map, resource);
+    } else if (g_hash_table_size (self->srtsocket_sink_map) != 0) {
+      /* In unauthenticated mode pick the first (and likely only) sink. When
+       * the relay doesn't have any connected sink, the source gets rejected. */
+      GHashTableIter it;
+
+      g_hash_table_iter_init (&it, self->srtsocket_sink_map);
+      g_hash_table_iter_next (&it, NULL, (gpointer *) & sink);
     }
-
-    _parse_stream_id (stream_id, NULL, &resource);
-
-    if (!resource) {
-      // Source socket must specify ID of the sink stream it wants to receive.
-      g_debug ("Rejecting source %d. No Resource Name found in Stream ID.",
-          sock);
-      goto reject;
-    }
-
-    g_debug ("Accepting source %d", sock);
-
-    sink = g_hash_table_lookup (self->username_sink_map, resource);
 
     if (!sink) {
       /* Reject the attempt to connect an unknown sink. */
       goto reject;
     }
+
+    g_debug ("Accepting source %d", sock);
 
     sink->sources = g_slist_append (sink->sources, GINT_TO_POINTER (sock));
   }
