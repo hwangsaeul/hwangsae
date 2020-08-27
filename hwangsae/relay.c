@@ -75,6 +75,8 @@ struct _HwangsaeRelay
   SRTSOCKET sink_listen_sock;
   SRTSOCKET source_listen_sock;
 
+  gboolean authentication;
+
   GHashTable *srtsocket_sink_map;
   GHashTable *username_sink_map;
   int poll_id;
@@ -97,6 +99,7 @@ enum
   PROP_SINK_PORT = 1,
   PROP_SOURCE_PORT,
   PROP_EXTERNAL_IP,
+  PROP_AUTHENTICATION,
   PROP_LAST
 };
 
@@ -187,6 +190,9 @@ hwangsae_relay_set_property (GObject * object, guint prop_id,
       }
       break;
     }
+    case PROP_AUTHENTICATION:
+      self->authentication = g_value_get_boolean (value);
+      break;
     default:
       G_OBJECT_WARN_INVALID_PROPERTY_ID (object, prop_id, pspec);
   }
@@ -206,6 +212,9 @@ hwangsae_relay_get_property (GObject * object, guint prop_id,
       break;
     case PROP_EXTERNAL_IP:
       g_value_set_string (value, self->external_ip);
+      break;
+    case PROP_AUTHENTICATION:
+      g_value_set_boolean (value, self->authentication);
       break;
     default:
       G_OBJECT_WARN_INVALID_PROPERTY_ID (object, prop_id, pspec);
@@ -299,6 +308,11 @@ hwangsae_relay_class_init (HwangsaeRelayClass * klass)
           "When set, the relay will use this IP address in its source and sink "
           "URIs. Otherwise, the first available non-loopback IP is used",
           NULL, G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS));
+
+  g_object_class_install_property (gobject_class, PROP_AUTHENTICATION,
+      g_param_spec_boolean ("authentication", "Enable authentication",
+          "Enable authentication", FALSE,
+          G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS));
 
   signals[SIG_CALLER_REJECTED] =
       g_signal_new ("caller-rejected", G_TYPE_FROM_CLASS (klass),
