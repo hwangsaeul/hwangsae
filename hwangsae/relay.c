@@ -105,6 +105,7 @@ enum
 
 enum
 {
+  SIG_CALLER_ACCEPTED,
   SIG_CALLER_REJECTED,
   SIG_IO_ERROR,
   LAST_SIGNAL
@@ -316,6 +317,12 @@ hwangsae_relay_class_init (HwangsaeRelayClass * klass)
           "Enable authentication", FALSE,
           G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS));
 
+  signals[SIG_CALLER_ACCEPTED] =
+      g_signal_new ("caller-accepted", G_TYPE_FROM_CLASS (klass),
+      G_SIGNAL_RUN_LAST, 0, NULL, NULL, NULL, G_TYPE_NONE, 4,
+      HWANGSAE_TYPE_CALLER_DIRECTION, G_TYPE_SOCKET_ADDRESS, G_TYPE_STRING,
+      G_TYPE_STRING);
+
   signals[SIG_CALLER_REJECTED] =
       g_signal_new ("caller-rejected", G_TYPE_FROM_CLASS (klass),
       G_SIGNAL_RUN_LAST, 0, NULL, NULL, NULL, G_TYPE_NONE, 4,
@@ -369,7 +376,7 @@ _parse_stream_id (const gchar * stream_id, gchar ** username, gchar ** resource)
 }
 
 static void
-hwangsae_relay_emit_caller_rejected (HwangsaeRelay * self,
+hwangsae_relay_emit_caller_signal (HwangsaeRelay * self, guint signal,
     HwangsaeCallerDirection direction, const struct sockaddr *peeraddr,
     const gchar * username, const gchar * resource)
 {
@@ -390,14 +397,14 @@ hwangsae_relay_emit_caller_rejected (HwangsaeRelay * self,
 
   addr = g_socket_address_new_from_native ((gpointer) peeraddr, peeraddr_len);
 
-  g_signal_emit (self, signals[SIG_CALLER_REJECTED], 0, direction, addr,
-      username, resource);
+  g_signal_emit (self, signals[signal], 0, direction, addr, username, resource);
 }
 
 static gint
 hwangsae_relay_accept_sink (HwangsaeRelay * self, SRTSOCKET sock,
     gint hs_version, const struct sockaddr *peeraddr, const gchar * stream_id)
 {
+  guint result = 0;
   gchar *username = NULL;
   SinkConnection *sink;
 
@@ -431,18 +438,24 @@ hwangsae_relay_accept_sink (HwangsaeRelay * self, SRTSOCKET sock,
     srt_epoll_add_usock (self->poll_id, sock, &SRT_POLL_EVENTS);
   }
 
-  return 0;
+  goto accept;
 
 reject:
-  hwangsae_relay_emit_caller_rejected (self, HWANGSAE_CALLER_DIRECTION_SINK,
-      peeraddr, username, NULL);
-  return -1;
+  result = -1;
+
+accept:
+  hwangsae_relay_emit_caller_signal (self,
+      (result == 0) ? SIG_CALLER_ACCEPTED : SIG_CALLER_REJECTED,
+      HWANGSAE_CALLER_DIRECTION_SINK, peeraddr, username, NULL);
+
+  return result;
 }
 
 static gint
 hwangsae_relay_accept_source (HwangsaeRelay * self, SRTSOCKET sock,
     gint hs_version, const struct sockaddr *peeraddr, const gchar * stream_id)
 {
+  guint result = 0;
   g_autofree gchar *resource = NULL;
   SinkConnection *sink = NULL;
 
@@ -479,12 +492,17 @@ hwangsae_relay_accept_source (HwangsaeRelay * self, SRTSOCKET sock,
     sink->sources = g_slist_append (sink->sources, GINT_TO_POINTER (sock));
   }
 
-  return 0;
-reject:
-  hwangsae_relay_emit_caller_rejected (self, HWANGSAE_CALLER_DIRECTION_SRC,
-      peeraddr, NULL, resource);
+  goto accept;
 
-  return -1;
+reject:
+  result = -1;
+
+accept:
+  hwangsae_relay_emit_caller_signal (self,
+      (result == 0) ? SIG_CALLER_ACCEPTED : SIG_CALLER_REJECTED,
+      HWANGSAE_CALLER_DIRECTION_SRC, peeraddr, NULL, resource);
+
+  return result;
 }
 
 static void
