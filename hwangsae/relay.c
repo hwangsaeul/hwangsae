@@ -511,7 +511,11 @@ hwangsae_relay_emit_io_error_locked (HwangsaeRelay * self, SRTSOCKET srtsocket,
 {
   g_autoptr (GSocketAddress) address = NULL;
   g_autoptr (GError) error = NULL;
-  struct sockaddr_storage sa_storage;
+  union
+  {
+    struct sockaddr_storage storage;
+    struct sockaddr sa;
+  } native;
   int sa_len;
   va_list valist;
 
@@ -519,9 +523,11 @@ hwangsae_relay_emit_io_error_locked (HwangsaeRelay * self, SRTSOCKET srtsocket,
   error = g_error_new_valist (HWANGSAE_RELAY_ERROR, code, format, valist);
   va_end (valist);
 
-  srt_getpeername (srtsocket, (struct sockaddr *) &sa_storage, &sa_len);
-
-  address = g_socket_address_new_from_native (&sa_storage, sa_len);
+  if (srt_getpeername (srtsocket, &native.sa, &sa_len) == 0) {
+    address = g_socket_address_new_from_native (&native.sa, sa_len);
+  } else {
+    g_warning ("Couldn't read peer address.");
+  }
 
   g_mutex_unlock (&self->lock);
   g_signal_emit (self, signals[SIG_IO_ERROR], 0, address, error);
