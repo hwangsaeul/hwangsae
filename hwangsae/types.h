@@ -43,6 +43,14 @@ typedef enum {
   HWANGSAE_CONTAINER_TS,
 } HwangsaeContainer;
 
+#define HWANGSAE_RELAY_ERROR           (hwangsae_relay_error_quark ())
+GQuark hwangsae_relay_error_quark      (void);
+
+typedef enum {
+  HWANGSAE_RELAY_ERROR_READ = 1,
+  HWANGSAE_RELAY_ERROR_WRITE,
+} HwangsaeRelayError;
+
 #define HWANGSAE_TRANSMUXER_ERROR      (hwangsae_transmuxer_error_quark())
 GQuark hwangsae_transmuxer_error_quark (void);
 
