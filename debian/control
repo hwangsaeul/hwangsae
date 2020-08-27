@@ -35,13 +35,6 @@ Description: SRT relay and recording API
  .
  This package contains development files for hwangsae.
 
-Package: hwangsae-relay
-Architecture: any
-Depends: adduser, libhwangsae1 (= ${binary:Version}), ${shlibs:Depends},
-  ${misc:Depends}
-Description: SRT relay service
- Hwangsae Relay Agent is a SRT relay service of Hwangsaeul.
-
 Package: hwangsae-recorder
 Architecture: any
 Depends: adduser, libhwangsae1 (= ${binary:Version}), ${shlibs:Depends},
