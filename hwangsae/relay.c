@@ -103,6 +103,7 @@ enum
 enum
 {
   SIG_CALLER_REJECTED,
+  SIG_IO_ERROR,
   LAST_SIGNAL
 };
 
@@ -304,6 +305,11 @@ hwangsae_relay_class_init (HwangsaeRelayClass * klass)
       G_SIGNAL_RUN_LAST, 0, NULL, NULL, NULL, G_TYPE_NONE, 4,
       HWANGSAE_TYPE_CALLER_DIRECTION, G_TYPE_SOCKET_ADDRESS, G_TYPE_STRING,
       G_TYPE_STRING);
+
+  signals[SIG_IO_ERROR] =
+      g_signal_new ("io-error", G_TYPE_FROM_CLASS (klass),
+      G_SIGNAL_RUN_LAST, 0, NULL, NULL, NULL, G_TYPE_NONE, 2,
+      G_TYPE_SOCKET_ADDRESS, G_TYPE_ERROR);
 }
 
 static void
@@ -453,6 +459,29 @@ reject:
   return -1;
 }
 
+static void
+hwangsae_relay_emit_io_error_locked (HwangsaeRelay * self, SRTSOCKET srtsocket,
+    gint code, const gchar * format, ...)
+{
+  g_autoptr (GSocketAddress) address = NULL;
+  g_autoptr (GError) error = NULL;
+  struct sockaddr_storage sa_storage;
+  int sa_len;
+  va_list valist;
+
+  va_start (valist, format);
+  error = g_error_new_valist (HWANGSAE_RELAY_ERROR, code, format, valist);
+  va_end (valist);
+
+  srt_getpeername (srtsocket, (struct sockaddr *) &sa_storage, &sa_len);
+
+  address = g_socket_address_new_from_native (&sa_storage, sa_len);
+
+  g_mutex_unlock (&self->lock);
+  g_signal_emit (self, signals[SIG_IO_ERROR], 0, address, error);
+  g_mutex_lock (&self->lock);
+}
+
 static gpointer
 _relay_main (gpointer data)
 {
@@ -517,7 +546,9 @@ _relay_main (gpointer data)
                   if (error == SRT_ECONNLOST) {
                     _sink_connection_remove_source (sink, source_socket);
                   } else {
-                    g_debug ("srt_send failed %s", srt_strerror (error, 0));
+                    hwangsae_relay_emit_io_error_locked (self, source_socket,
+                        HWANGSAE_RELAY_ERROR_WRITE, "srt_send failed: %s",
+                        srt_strerror (error, 0));
                   }
                 }
               }
@@ -527,7 +558,9 @@ _relay_main (gpointer data)
                 hwangsae_relay_remove_sink (self, sink);
                 break;
               } else if (error != SRT_EASYNCRCV) {
-                g_debug ("srt_recv error %s", srt_strerror (error, 0));
+                hwangsae_relay_emit_io_error_locked (self, rsocket,
+                    HWANGSAE_RELAY_ERROR_READ, "srt_recv failed: %s",
+                    srt_strerror (error, 0));
               }
             }
           } while (recv > 0);
