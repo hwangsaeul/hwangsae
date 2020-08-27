@@ -33,17 +33,9 @@ Description: SRT relay and recording API
  .
  This package contains development files for hwangsae.
 
-Package: hwangsae-recorder
-Architecture: any
-Depends: adduser, libhwangsae1 (= ${binary:Version}), ${shlibs:Depends},
-  ${misc:Depends}
-Description: SRT recorder service
- Hwangsae Recorder Agent is a stream recording service of Hwangsaeul.
-
 Package: hwangsae-tools
 Architecture: any
 Depends: libhwangsae1 (= ${binary:Version}), ${shlibs:Depends}, ${misc:Depends}
 Description: SRT relay and recording tools
  Hwangsae Tools is a set of SRT relay and recording CLIs.
-
 
