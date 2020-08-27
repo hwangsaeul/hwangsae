@@ -10,7 +10,6 @@ dbus_ifaces = [
 ]
 
 dbus_configs = [
-  'org.hwangsaeul.Hwangsae1.RelayAgent.conf',
   'org.hwangsaeul.Hwangsae1.RecorderAgent.conf',
 ]
 
