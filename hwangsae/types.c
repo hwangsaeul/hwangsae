@@ -19,5 +19,6 @@
 #include "types.h"
 
 /* *INDENT-OFF* */
+G_DEFINE_QUARK (hwangsae-relay-error-quark, hwangsae_relay_error)
 G_DEFINE_QUARK (hwangsae-transmuxer-error-quark, hwangsae_transmuxer_error)
 /* *INDENT-ON* */
