@@ -108,6 +108,7 @@ enum
   SIG_CALLER_ACCEPTED,
   SIG_CALLER_REJECTED,
   SIG_IO_ERROR,
+  SIG_AUTHENTICATE,
   LAST_SIGNAL
 };
 
@@ -286,6 +287,26 @@ failed:
   return SRT_INVALID_SOCK;
 }
 
+gboolean
+hwangsae_relay_default_authenticate (HwangsaeRelay * self,
+    HwangsaeCallerDirection direction, const GSocketAddress * addr,
+    const gchar * username, const gchar * resource)
+{
+  /* Accept all connections. */
+  return TRUE;
+}
+
+gboolean
+_authentication_accumulator (GSignalInvocationHint * ihint,
+    GValue * return_accu, const GValue * handler_return, gpointer data)
+{
+  gboolean ret = g_value_get_boolean (handler_return);
+  /* Handlers return TRUE on authentication success and we want to stop on
+   * the first failure. */
+  g_value_set_boolean (return_accu, ret);
+  return ret;
+}
+
 static void
 hwangsae_relay_class_init (HwangsaeRelayClass * klass)
 {
@@ -333,6 +354,13 @@ hwangsae_relay_class_init (HwangsaeRelayClass * klass)
       g_signal_new ("io-error", G_TYPE_FROM_CLASS (klass),
       G_SIGNAL_RUN_LAST, 0, NULL, NULL, NULL, G_TYPE_NONE, 2,
       G_TYPE_SOCKET_ADDRESS, G_TYPE_ERROR);
+
+  signals[SIG_AUTHENTICATE] =
+      g_signal_new_class_handler ("authenticate", G_TYPE_FROM_CLASS (klass),
+      G_SIGNAL_RUN_LAST, G_CALLBACK (hwangsae_relay_default_authenticate),
+      _authentication_accumulator, NULL, NULL,
+      G_TYPE_BOOLEAN, 4, HWANGSAE_TYPE_CALLER_DIRECTION, G_TYPE_SOCKET_ADDRESS,
+      G_TYPE_STRING, G_TYPE_STRING);
 }
 
 static void
@@ -375,12 +403,9 @@ _parse_stream_id (const gchar * stream_id, gchar ** username, gchar ** resource)
   g_strfreev (keys);
 }
 
-static void
-hwangsae_relay_emit_caller_signal (HwangsaeRelay * self, guint signal,
-    HwangsaeCallerDirection direction, const struct sockaddr *peeraddr,
-    const gchar * username, const gchar * resource)
+static GSocketAddress *
+_peeraddr_to_g_socket_address (const struct sockaddr *peeraddr)
 {
-  g_autoptr (GSocketAddress) addr = NULL;
   gsize peeraddr_len;
 
   switch (peeraddr->sa_family) {
@@ -392,12 +417,10 @@ hwangsae_relay_emit_caller_signal (HwangsaeRelay * self, guint signal,
       break;
     default:
       g_warning ("Unsupported address family %d", peeraddr->sa_family);
-      return;
+      return NULL;
   }
 
-  addr = g_socket_address_new_from_native ((gpointer) peeraddr, peeraddr_len);
-
-  g_signal_emit (self, signals[signal], 0, direction, addr, username, resource);
+  return g_socket_address_new_from_native ((gpointer) peeraddr, peeraddr_len);
 }
 
 static gint
@@ -405,20 +428,36 @@ hwangsae_relay_accept_sink (HwangsaeRelay * self, SRTSOCKET sock,
     gint hs_version, const struct sockaddr *peeraddr, const gchar * stream_id)
 {
   guint result = 0;
+  g_autoptr (GSocketAddress) addr = _peeraddr_to_g_socket_address (peeraddr);
+  g_autofree gchar *username_autofree = NULL;
   gchar *username = NULL;
+  g_autofree gchar *resource = NULL;
   SinkConnection *sink;
 
   {
+    gboolean authenticated;
+
     LOCK_RELAY;
 
     if (self->authentication) {
-      _parse_stream_id (stream_id, &username, NULL);
+      _parse_stream_id (stream_id, &username, &resource);
+      username_autofree = username;
+
       if (!username
           || g_hash_table_contains (self->username_sink_map, username)) {
         /* Sink socket must have username in its Stream ID and not been already
          * registered. */
         goto reject;
       }
+
+      g_signal_emit (self, signals[SIG_AUTHENTICATE], 0,
+          HWANGSAE_CALLER_DIRECTION_SINK, addr, username, resource,
+          &authenticated);
+
+      if (!authenticated) {
+        goto reject;
+      }
+
     } else if (g_hash_table_size (self->srtsocket_sink_map) != 0) {
       /* When authentication is off, only one sink can connect. */
       goto reject;
@@ -428,7 +467,7 @@ hwangsae_relay_accept_sink (HwangsaeRelay * self, SRTSOCKET sock,
 
     sink = g_new0 (SinkConnection, 1);
     sink->socket = sock;
-    sink->username = username;
+    sink->username = g_steal_pointer (&username_autofree);
 
     g_hash_table_insert (self->srtsocket_sink_map, &sink->socket, sink);
     if (sink->username) {
@@ -444,9 +483,9 @@ reject:
   result = -1;
 
 accept:
-  hwangsae_relay_emit_caller_signal (self,
-      (result == 0) ? SIG_CALLER_ACCEPTED : SIG_CALLER_REJECTED,
-      HWANGSAE_CALLER_DIRECTION_SINK, peeraddr, username, NULL);
+  g_signal_emit (self,
+      signals[(result == 0) ? SIG_CALLER_ACCEPTED : SIG_CALLER_REJECTED],
+      0, HWANGSAE_CALLER_DIRECTION_SINK, addr, username, resource);
 
   return result;
 }
@@ -456,14 +495,18 @@ hwangsae_relay_accept_source (HwangsaeRelay * self, SRTSOCKET sock,
     gint hs_version, const struct sockaddr *peeraddr, const gchar * stream_id)
 {
   guint result = 0;
+  g_autoptr (GSocketAddress) addr = _peeraddr_to_g_socket_address (peeraddr);
+  g_autofree gchar *username = NULL;
   g_autofree gchar *resource = NULL;
   SinkConnection *sink = NULL;
 
   {
+    gboolean authenticated = TRUE;
+
     LOCK_RELAY;
 
     if (self->authentication) {
-      _parse_stream_id (stream_id, NULL, &resource);
+      _parse_stream_id (stream_id, &username, &resource);
 
       if (!resource) {
         // Source socket must specify ID of the sink stream it wants to receive.
@@ -487,6 +530,14 @@ hwangsae_relay_accept_source (HwangsaeRelay * self, SRTSOCKET sock,
       goto reject;
     }
 
+    g_signal_emit (self, signals[SIG_AUTHENTICATE], 0,
+        HWANGSAE_CALLER_DIRECTION_SINK, addr, username, resource,
+        &authenticated);
+
+    if (!authenticated) {
+      goto reject;
+    }
+
     g_debug ("Accepting source %d", sock);
 
     sink->sources = g_slist_append (sink->sources, GINT_TO_POINTER (sock));
@@ -498,9 +549,9 @@ reject:
   result = -1;
 
 accept:
-  hwangsae_relay_emit_caller_signal (self,
-      (result == 0) ? SIG_CALLER_ACCEPTED : SIG_CALLER_REJECTED,
-      HWANGSAE_CALLER_DIRECTION_SRC, peeraddr, NULL, resource);
+  g_signal_emit (self,
+      signals[(result == 0) ? SIG_CALLER_ACCEPTED : SIG_CALLER_REJECTED],
+      0, HWANGSAE_CALLER_DIRECTION_SRC, addr, username, resource);
 
   return result;
 }
