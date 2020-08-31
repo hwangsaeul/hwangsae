@@ -1,41 +1,50 @@
 Source: hwangsae
 Priority: optional
 Maintainer: Jeongseok Kim <jeongseok.kim@sk.com>
-Build-Depends: debhelper (>= 10~),
-  meson,
-  pkg-config,
-  libglib2.0-dev,
-  libjson-glib-dev,
-  libgaeguli-dev,
-  libsrt-dev,
-  libsoup2.4-dev,
-  libgstreamer1.0-dev,
-  libgstreamer-plugins-base1.0-dev,
-  libgstreamer-plugins-bad1.0-dev
+Build-Depends:
+ debhelper (>= 10~),
+ libgaeguli-dev,
+ libglib2.0-dev,
+ libgstreamer-plugins-bad1.0-dev,
+ libgstreamer-plugins-base1.0-dev,
+ libgstreamer1.0-dev,
+ libjson-glib-dev,
+ libsoup2.4-dev,
+ libsrt-dev,
+ meson,
+ pkg-config,
 Standards-Version: 4.2.1
 Section: libs
 Homepage: https://github.com/hwangsaeul/hwangsae
 Vcs-Browser: https://github.com/hwangsaeul/hwangsae
 Vcs-Git: https://github.com/hwangsaeul/hwangsae.git
 
-Package: libhwangsae1
+Package: hwangsae-tools
 Architecture: any
-Depends: libgaeguli1, ${shlibs:Depends}, ${misc:Depends}
-Description: SRT relay and recording API
- A set of library for SRT relay and recording.
+Depends:
+ libhwangsae2 (= ${binary:Version}),
+ ${misc:Depends},
+ ${shlibs:Depends},
+Description: SRT relay and recording tools
+ Hwangsae Tools is a set of SRT relay and recording CLIs.
 
 Package: libhwangsae-dev
 Section: libdevel
 Architecture: any
-Depends: libhwangsae1 (= ${binary:Version}), libsoup2.4-dev, ${misc:Depends}
+Depends:
+ libhwangsae2 (= ${binary:Version}),
+ libsoup2.4-dev,
+ ${misc:Depends},
 Description: SRT relay and recording API
  A set of library for SRT relay and recording.
  .
  This package contains development files for hwangsae.
 
-Package: hwangsae-tools
+Package: libhwangsae2
 Architecture: any
-Depends: libhwangsae1 (= ${binary:Version}), ${shlibs:Depends}, ${misc:Depends}
-Description: SRT relay and recording tools
- Hwangsae Tools is a set of SRT relay and recording CLIs.
-
+Depends:
+ libgaeguli1,
+ ${misc:Depends},
+ ${shlibs:Depends},
+Description: SRT relay and recording API
+ A set of library for SRT relay and recording.
