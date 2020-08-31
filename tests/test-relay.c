@@ -27,7 +27,7 @@
 #include <gst/pbutils/gstdiscoverer.h>
 
 static gchar *build_source_uri (HwangsaeTestStreamer * streamer,
-    HwangsaeRelay * relay);
+    HwangsaeRelay * relay, const gchar * username);
 
 static void
 test_relay_instance (void)
@@ -149,7 +149,7 @@ test_1_to_n (void)
 
   g_object_set (relay, "authentication", TRUE, NULL);
 
-  source_uri = build_source_uri (streamer, relay);
+  source_uri = build_source_uri (streamer, relay, NULL);
   data1.source_uri = data2.source_uri = source_uri;
   data1.resolution = data2.resolution = GAEGULI_VIDEO_RESOLUTION_640X480;
 
@@ -167,15 +167,16 @@ test_1_to_n (void)
 }
 
 static gchar *
-build_source_uri (HwangsaeTestStreamer * streamer, HwangsaeRelay * relay)
+build_source_uri (HwangsaeTestStreamer * streamer, HwangsaeRelay * relay,
+    const gchar * username)
 {
   g_autofree gchar *streamid = NULL;
   g_autofree gchar *source_uri = NULL;
   g_autofree gchar *stream_caps_str = NULL;
-  const gchar *username;
+  const gchar *resource;
 
-  g_object_get (streamer, "username", &username, NULL);
-  streamid = g_strdup_printf ("#!::r=%s", username);
+  g_object_get (streamer, "username", &resource, NULL);
+  streamid = g_strdup_printf ("#!::u=%s,r=%s", username, resource);
   streamid = g_uri_escape_string (streamid, NULL, FALSE);
 
   return g_strdup_printf ("%s?streamid=%s",
@@ -199,13 +200,13 @@ test_m_to_n (void)
       hwangsae_relay_get_sink_uri (relay));
   data1.resolution = GAEGULI_VIDEO_RESOLUTION_640X480;
   g_object_set (streamer1, "resolution", data1.resolution, NULL);
-  data1.source_uri = source_uri1 = build_source_uri (streamer1, relay);
+  data1.source_uri = source_uri1 = build_source_uri (streamer1, relay, NULL);
 
   hwangsae_test_streamer_set_uri (streamer2,
       hwangsae_relay_get_sink_uri (relay));
   data2.resolution = GAEGULI_VIDEO_RESOLUTION_1920X1080;
   g_object_set (streamer2, "resolution", data2.resolution, NULL);
-  data2.source_uri = source_uri2 = build_source_uri (streamer2, relay);
+  data2.source_uri = source_uri2 = build_source_uri (streamer2, relay, NULL);
 
   hwangsae_test_streamer_start (streamer1);
   hwangsae_test_streamer_start (streamer2);
@@ -304,6 +305,132 @@ test_reject_source (void)
   gst_element_set_state (receiver, GST_STATE_NULL);
 }
 
+static const gchar *ACCEPTED_USERNAME = "ValidName";
+static const gchar *REJECTED_USERNAME = "YouShallNotPass";
+
+typedef struct
+{
+  gboolean sink_accepted;
+  gboolean sink_rejected;
+  gboolean source_accepted;
+  gboolean source_rejected;
+} AuthenticationTestData;
+
+static gboolean
+_authenticate (HwangsaeRelay * relay, HwangsaeCallerDirection direction,
+    GSocketAddress * addr, const gchar * username, const gchar * resource,
+    gpointer data)
+{
+  return g_strcmp0 (username, REJECTED_USERNAME);
+}
+
+static void
+_caller_accepted (HwangsaeRelay * relay, HwangsaeCallerDirection direction,
+    GSocketAddress * addr, const gchar * username, const gchar * resource,
+    AuthenticationTestData * data)
+{
+  if (!g_strcmp0 (username, ACCEPTED_USERNAME)) {
+    switch (direction) {
+      case HWANGSAE_CALLER_DIRECTION_SINK:
+        data->sink_accepted = TRUE;
+        break;
+      case HWANGSAE_CALLER_DIRECTION_SRC:
+        data->source_accepted = TRUE;
+        break;
+    }
+
+    return;
+  }
+
+  g_assert_not_reached ();
+}
+
+static void
+_caller_rejected (HwangsaeRelay * relay, HwangsaeCallerDirection direction,
+    GSocketAddress * addr, const gchar * username, const gchar * resource,
+    AuthenticationTestData * data)
+{
+  if (!g_strcmp0 (username, REJECTED_USERNAME)) {
+    switch (direction) {
+      case HWANGSAE_CALLER_DIRECTION_SINK:
+        data->sink_rejected = TRUE;
+        break;
+      case HWANGSAE_CALLER_DIRECTION_SRC:
+        data->source_rejected = TRUE;
+        break;
+    }
+
+    return;
+  }
+
+  g_assert_not_reached ();
+}
+
+static void
+test_authentication (void)
+{
+  AuthenticationTestData data = { 0 };
+  g_autoptr (HwangsaeRelay) relay = hwangsae_relay_new (NULL, 8888, 9999);
+  g_autoptr (HwangsaeTestStreamer) stream = hwangsae_test_streamer_new ();
+  g_autofree gchar *uri = NULL;
+  g_autofree gchar *pipeline = NULL;
+  g_autoptr (GstElement) receiver = NULL;
+  g_autoptr (GError) error = NULL;
+
+  g_object_set (relay, "authentication", TRUE, NULL);
+  g_object_set (stream, "username", REJECTED_USERNAME, NULL);
+
+  g_signal_connect (relay, "caller-accepted", (GCallback) _caller_accepted,
+      &data);
+  g_signal_connect (relay, "caller-rejected", (GCallback) _caller_rejected,
+      &data);
+  g_signal_connect (relay, "authenticate", (GCallback) _authenticate, &data);
+
+  hwangsae_test_streamer_set_uri (stream, hwangsae_relay_get_sink_uri (relay));
+  hwangsae_test_streamer_start (stream);
+
+  while (!data.sink_rejected) {
+    g_main_context_iteration (NULL, FALSE);
+  }
+
+  hwangsae_test_streamer_stop (stream);
+  g_object_set (stream, "username", ACCEPTED_USERNAME, NULL);
+  hwangsae_test_streamer_start (stream);
+
+  while (!data.sink_accepted) {
+    g_main_context_iteration (NULL, FALSE);
+  }
+
+  uri = build_source_uri (stream, relay, REJECTED_USERNAME);
+  pipeline = g_strdup_printf ("srtsrc uri=%s ! fakesink", uri);
+  receiver = gst_parse_launch (pipeline, &error);
+  g_clear_pointer (&uri, g_free);
+  g_clear_pointer (&pipeline, g_free);
+  g_assert_no_error (error);
+
+  gst_element_set_state (receiver, GST_STATE_PLAYING);
+
+  while (!data.source_rejected) {
+    g_main_context_iteration (NULL, FALSE);
+  }
+
+  gst_element_set_state (receiver, GST_STATE_NULL);
+  gst_clear_object (&receiver);
+
+  uri = build_source_uri (stream, relay, ACCEPTED_USERNAME);
+  pipeline = g_strdup_printf ("srtsrc uri=%s ! fakesink", uri);
+  receiver = gst_parse_launch (pipeline, &error);
+  g_assert_no_error (error);
+
+  gst_element_set_state (receiver, GST_STATE_PLAYING);
+
+  while (!data.source_accepted) {
+    g_main_context_iteration (NULL, FALSE);
+  }
+
+  gst_element_set_state (receiver, GST_STATE_NULL);
+}
+
 static void
 _flip_flag (HwangsaeRelay * relay, HwangsaeCallerDirection direction,
     GInetSocketAddress * addr, const gchar * username, const gchar * resource,
@@ -326,7 +453,7 @@ test_no_auth (void)
 
   data1.resolution = data2.resolution = GAEGULI_VIDEO_RESOLUTION_640X480;
   data1.source_uri = data2.source_uri = source_uri =
-      build_source_uri (stream1, relay);
+      build_source_uri (stream1, relay, NULL);
 
   g_object_set (relay, "authentication", FALSE, NULL);
 
@@ -385,6 +512,7 @@ main (int argc, char *argv[])
   g_test_add_func ("/hwangsae/relay-external-ip", test_external_ip);
   g_test_add_func ("/hwangsae/relay-reject-sink", test_reject_sink);
   g_test_add_func ("/hwangsae/relay-reject-source", test_reject_source);
+  g_test_add_func ("/hwangsae/relay-authentication", test_authentication);
   g_test_add_func ("/hwangsae/relay-no-auth", test_no_auth);
 
   return g_test_run ();
