@@ -43,7 +43,7 @@ Description: SRT relay and recording API
 Package: libhwangsae2
 Architecture: any
 Depends:
- libgaeguli1,
+ libgaeguli2,
  ${misc:Depends},
  ${shlibs:Depends},
 Description: SRT relay and recording API
