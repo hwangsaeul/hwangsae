@@ -53,6 +53,15 @@ HwangsaeRelay          *hwangsae_relay_new              (const gchar   *external
                                                          guint          source_port);
 
 /**
+ * hwangsae_relay_start:
+ * @relay: a HwangsaeRelay object
+ *
+ * Makes the relay start listening on sink and source ports and forwarding
+ * the streams.
+ */
+void                    hwangsae_relay_start            (HwangsaeRelay *relay);
+
+/**
  * hwangsae_relay_get_sink_uri:
  * @relay: a pointer to a HwangsaeRelay object
  *

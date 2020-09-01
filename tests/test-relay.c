@@ -155,6 +155,8 @@ test_1_to_n (void)
 
   hwangsae_test_streamer_set_uri (streamer,
       hwangsae_relay_get_sink_uri (relay));
+
+  hwangsae_relay_start (relay);
   hwangsae_test_streamer_start (streamer);
 
   /* Connect and validate two receivers. */
@@ -208,6 +210,7 @@ test_m_to_n (void)
   g_object_set (streamer2, "resolution", data2.resolution, NULL);
   data2.source_uri = source_uri2 = build_source_uri (streamer2, relay, NULL);
 
+  hwangsae_relay_start (relay);
   hwangsae_test_streamer_start (streamer1);
   hwangsae_test_streamer_start (streamer2);
 
@@ -257,6 +260,7 @@ test_reject_sink (void)
   g_signal_connect (relay, "caller-rejected", (GCallback) _on_sink_rejected,
       loop);
 
+  hwangsae_relay_start (relay);
   hwangsae_test_streamer_start (streamer);
 
   g_main_loop_run (loop);
@@ -293,6 +297,8 @@ test_reject_source (void)
 
   g_signal_connect (relay, "caller-rejected", (GCallback) _on_source_rejected,
       loop);
+
+  hwangsae_relay_start (relay);
 
   receiver = gst_parse_launch ("srtsrc uri=srt://127.0.0.1:9999?mode=caller ! "
       "fakesink", &error);
@@ -390,6 +396,8 @@ test_authentication (void)
   g_signal_connect (relay, "authenticate", (GCallback) _authenticate, &data);
 
   hwangsae_test_streamer_set_uri (stream, hwangsae_relay_get_sink_uri (relay));
+
+  hwangsae_relay_start (relay);
   hwangsae_test_streamer_start (stream);
 
   while (!data.sink_rejected) {
@@ -459,6 +467,8 @@ test_no_auth (void)
       build_source_uri (stream1, relay, NULL);
 
   g_object_set (relay, "authentication", FALSE, NULL);
+
+  hwangsae_relay_start (relay);
 
   /* Connect first streamer. */
 
