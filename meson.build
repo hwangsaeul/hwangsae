@@ -52,8 +52,6 @@ libsrt_dep = dependency('srt', version: '>=1.3.4')
 
 soup_dep = dependency('libsoup-2.4')
 
-json_glib_dep = dependency('json-glib-1.0')
-
 hwangsaeul_req_version = '>= 0.9.0'
 
 gaeguli_dep = dependency('gaeguli-1.0', version: hwangsaeul_req_version,
