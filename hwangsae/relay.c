@@ -37,6 +37,8 @@ typedef struct
   GSList *sources;
 } SinkConnection;
 
+static gchar *_make_stream_id (const gchar * username, const gchar * resource);
+
 static void
 _sink_connection_remove_source (SinkConnection * sink, SRTSOCKET source)
 {
@@ -127,8 +129,6 @@ typedef struct
 } SrtParam;
 
 static SrtParam srt_params[] = {
-  {"SRTO_SNDSYN", SRTO_SNDSYN, 0},      /* 0: non-blocking */
-  {"SRTO_RCVSYN", SRTO_RCVSYN, 0},      /* 0: non-blocking */
   {"SRTO_LINGER", SRTO_LINGER, 0},
   {"SRTO_TSBPMODE", SRTO_TSBPDMODE, 1}, /* Timestamp-based Packet Delivery */
   {"SRTO_RENDEZVOUS", SRTO_RENDEZVOUS, 0},      /* 0: not for rendezvous */
@@ -260,6 +260,19 @@ _apply_socket_options (SRTSOCKET sock)
   }
 }
 
+static void
+_make_socket_nonblocking (SRTSOCKET sock)
+{
+  gint val = 0;
+
+  if (srt_setsockflag (sock, SRTO_SNDSYN, &val, sizeof (gint))) {
+    g_error ("%s", srt_getlasterror_str ());
+  }
+  if (srt_setsockflag (sock, SRTO_RCVSYN, &val, sizeof (gint))) {
+    g_error ("%s", srt_getlasterror_str ());
+  }
+}
+
 static SRTSOCKET
 _srt_open_listen_sock (guint port)
 {
@@ -284,6 +297,7 @@ _srt_open_listen_sock (guint port)
 
   listen_sock = srt_socket (AF_INET, SOCK_DGRAM, 0);
   _apply_socket_options (listen_sock);
+  _make_socket_nonblocking (listen_sock);
 
   if (srt_bind (listen_sock, sa, sockaddr_len) == SRT_ERROR) {
     goto srt_failed;
@@ -305,6 +319,52 @@ srt_failed:
 failed:
   if (error != NULL) {
     g_error ("%s", error->message);
+  }
+
+  return SRT_INVALID_SOCK;
+}
+
+static SRTSOCKET
+hwangsae_relay_open_master_sock (HwangsaeRelay * self, const gchar * resource)
+{
+  SRTSOCKET master_sock;
+  gpointer sa;
+  gsize sa_len;
+  GSocketAddress *addr = G_SOCKET_ADDRESS (self->master_address);
+  g_autoptr (GError) error = NULL;
+  g_autofree gchar *streamid = NULL;
+
+  sa_len = g_socket_address_get_native_size (addr);
+  sa = g_alloca (sa_len);
+
+  if (!g_socket_address_to_native (addr, sa, sa_len, &error)) {
+    goto failed;
+  }
+
+  master_sock = srt_socket (AF_INET, SOCK_DGRAM, 0);
+  _apply_socket_options (master_sock);
+
+  streamid = _make_stream_id (self->master_username, resource);
+  srt_setsockflag (master_sock, SRTO_STREAMID, streamid, strlen (streamid));
+
+  if (srt_connect (master_sock, sa, sa_len) == SRT_ERROR) {
+    goto srt_failed;
+  }
+
+  _make_socket_nonblocking (master_sock);
+
+  return master_sock;
+
+srt_failed:
+  g_debug ("%s", srt_getlasterror_str ());
+
+  if (master_sock != SRT_INVALID_SOCK) {
+    srt_close (master_sock);
+  }
+
+failed:
+  if (error != NULL) {
+    g_debug ("%s", error->message);
   }
 
   return SRT_INVALID_SOCK;
@@ -395,10 +455,11 @@ hwangsae_relay_class_init (HwangsaeRelayClass * klass)
       G_TYPE_STRING, G_TYPE_STRING);
 }
 
+const gchar STREAM_ID_PREFIX[] = "#!::";
+
 static void
 _parse_stream_id (const gchar * stream_id, gchar ** username, gchar ** resource)
 {
-  const gchar STREAM_ID_PREFIX[] = "#!::";
   gchar **keys;
   gchar **it;
 
@@ -433,6 +494,12 @@ _parse_stream_id (const gchar * stream_id, gchar ** username, gchar ** resource)
   }
 
   g_strfreev (keys);
+}
+
+static gchar *
+_make_stream_id (const gchar * username, const gchar * resource)
+{
+  return g_strdup_printf ("%su=%s,r=%s", STREAM_ID_PREFIX, username, resource);
 }
 
 static GSocketAddress *
@@ -529,7 +596,8 @@ hwangsae_relay_accept_source (HwangsaeRelay * self, SRTSOCKET sock,
   guint result = 0;
   g_autoptr (GSocketAddress) addr = _peeraddr_to_g_socket_address (peeraddr);
   g_autofree gchar *username = NULL;
-  g_autofree gchar *resource = NULL;
+  g_autofree gchar *resource_autofree = NULL;
+  gchar *resource = NULL;
   SinkConnection *sink = NULL;
 
   {
@@ -539,6 +607,7 @@ hwangsae_relay_accept_source (HwangsaeRelay * self, SRTSOCKET sock,
 
     if (self->authentication) {
       _parse_stream_id (stream_id, &username, &resource);
+      resource_autofree = resource;
 
       if (!resource) {
         // Source socket must specify ID of the sink stream it wants to receive.
@@ -557,7 +626,7 @@ hwangsae_relay_accept_source (HwangsaeRelay * self, SRTSOCKET sock,
       g_hash_table_iter_next (&it, NULL, (gpointer *) & sink);
     }
 
-    if (!sink) {
+    if (!sink && !self->master_address) {
       /* Reject the attempt to connect an unknown sink. */
       goto reject;
     }
@@ -568,6 +637,28 @@ hwangsae_relay_accept_source (HwangsaeRelay * self, SRTSOCKET sock,
 
     if (!authenticated) {
       goto reject;
+    }
+
+    if (!sink) {
+      /* In slave mode, open sink connection to the master relay. */
+      SRTSOCKET master_sock;
+
+      g_assert (self->master_address);
+
+      master_sock = hwangsae_relay_open_master_sock (self, resource);
+      if (master_sock == SRT_INVALID_SOCK) {
+        g_debug ("Unable to open master SRT socket");
+        goto reject;
+      }
+
+      sink = g_new0 (SinkConnection, 1);
+      sink->socket = master_sock;
+      sink->username = g_steal_pointer (&resource_autofree);
+
+      g_hash_table_insert (self->srtsocket_sink_map, &sink->socket, sink);
+      g_hash_table_insert (self->username_sink_map, sink->username, sink);
+
+      srt_epoll_add_usock (self->poll_id, sink->socket, &SRT_POLL_EVENTS);
     }
 
     g_debug ("Accepting source %d", sock);
@@ -624,12 +715,22 @@ _relay_main (gpointer data)
   SRTSOCKET readfds[MAX_EPOLL_SRT_SOCKETS];
   gchar buf[1400];
 
-  self->sink_listen_sock = _srt_open_listen_sock (self->sink_port);
-  srt_listen_callback (self->sink_listen_sock,
-      (srt_listen_callback_fn *) hwangsae_relay_accept_sink, self);
-  srt_epoll_add_usock (self->poll_id, self->sink_listen_sock, &SRT_POLL_EVENTS);
+  if (self->master_address) {
+    g_autofree gchar *addr_s =
+        g_inet_address_to_string (g_inet_socket_address_get_address
+        (self->master_address));
+    g_debug ("Acting as a slave to the master relay at %s:%u", addr_s,
+        g_inet_socket_address_get_port (self->master_address));
+  } else {
+    self->sink_listen_sock = _srt_open_listen_sock (self->sink_port);
+    srt_listen_callback (self->sink_listen_sock,
+        (srt_listen_callback_fn *) hwangsae_relay_accept_sink, self);
+    srt_epoll_add_usock (self->poll_id, self->sink_listen_sock,
+        &SRT_POLL_EVENTS);
 
-  g_debug ("URI for sink connection is %s", hwangsae_relay_get_sink_uri (self));
+    g_debug ("URI for sink connection is %s",
+        hwangsae_relay_get_sink_uri (self));
+  }
 
   self->source_listen_sock = _srt_open_listen_sock (self->source_port);
   srt_listen_callback (self->source_listen_sock,
@@ -699,6 +800,11 @@ _relay_main (gpointer data)
               }
             }
           } while (recv > 0);
+
+          if (self->master_address && sink->sources == NULL) {
+            /* In slave mode, close unused sink connections. */
+            hwangsae_relay_remove_sink (self, sink);
+          }
         }
       }
     }
