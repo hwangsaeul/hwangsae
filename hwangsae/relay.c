@@ -77,6 +77,9 @@ struct _HwangsaeRelay
 
   gboolean authentication;
 
+  GInetSocketAddress *master_address;
+  gchar *master_username;
+
   GHashTable *srtsocket_sink_map;
   GHashTable *username_sink_map;
   int poll_id;
@@ -100,6 +103,8 @@ enum
   PROP_SOURCE_PORT,
   PROP_EXTERNAL_IP,
   PROP_AUTHENTICATION,
+  PROP_MASTER_URI,
+  PROP_MASTER_USERNAME,
   PROP_LAST
 };
 
@@ -155,6 +160,9 @@ hwangsae_relay_finalize (GObject * object)
   srt_close (self->sink_listen_sock);
   srt_close (self->source_listen_sock);
 
+  g_clear_object (&self->master_address);
+  g_clear_pointer (&self->master_username, g_free);
+
   g_hash_table_destroy (self->srtsocket_sink_map);
   g_hash_table_destroy (self->username_sink_map);
 
@@ -194,6 +202,23 @@ hwangsae_relay_set_property (GObject * object, guint prop_id,
     }
     case PROP_AUTHENTICATION:
       self->authentication = g_value_get_boolean (value);
+      break;
+    case PROP_MASTER_URI:{
+      g_autofree gchar *host = NULL;
+      guint port = 0;
+
+      if (hwangsae_common_parse_srt_uri (g_value_get_string (value), &host,
+              &port)) {
+        g_autoptr (GInetAddress) addr = g_inet_address_new_from_string (host);
+        g_clear_object (&self->master_address);
+        self->master_address =
+            G_INET_SOCKET_ADDRESS (g_inet_socket_address_new (addr, port));
+      }
+      break;
+    }
+    case PROP_MASTER_USERNAME:
+      g_clear_pointer (&self->master_username, g_free);
+      self->master_username = g_value_dup_string (value);
       break;
     default:
       G_OBJECT_WARN_INVALID_PROPERTY_ID (object, prop_id, pspec);
@@ -334,6 +359,16 @@ hwangsae_relay_class_init (HwangsaeRelayClass * klass)
       g_param_spec_boolean ("authentication", "Enable authentication",
           "Enable authentication", FALSE,
           G_PARAM_READWRITE | G_PARAM_STATIC_STRINGS));
+
+  g_object_class_install_property (gobject_class, PROP_MASTER_URI,
+      g_param_spec_string ("master-uri", "Master relay URI",
+          "URI of the master relay this instance should chain into",
+          NULL, G_PARAM_WRITABLE | G_PARAM_STATIC_STRINGS));
+
+  g_object_class_install_property (gobject_class, PROP_MASTER_USERNAME,
+      g_param_spec_string ("master-username", "Master relay username",
+          "Username this relay should use to authenticate with the master",
+          NULL, G_PARAM_WRITABLE | G_PARAM_STATIC_STRINGS));
 
   signals[SIG_CALLER_ACCEPTED] =
       g_signal_new ("caller-accepted", G_TYPE_FROM_CLASS (klass),
