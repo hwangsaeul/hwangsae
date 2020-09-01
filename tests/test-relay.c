@@ -375,14 +375,31 @@ _caller_rejected (HwangsaeRelay * relay, HwangsaeCallerDirection direction,
   }
 }
 
+static GstElement *
+make_receiver (HwangsaeTestStreamer * streamer, HwangsaeRelay * relay,
+    const gchar * username)
+{
+  g_autofree gchar *uri = NULL;
+  g_autofree gchar *pipeline = NULL;
+  g_autoptr (GstElement) receiver = NULL;
+  g_autoptr (GError) error = NULL;
+
+  uri = build_source_uri (streamer, relay, username);
+  pipeline = g_strdup_printf ("srtsrc uri=%s ! fakesink", uri);
+  receiver = gst_parse_launch (pipeline, &error);
+  g_assert_no_error (error);
+
+  gst_element_set_state (receiver, GST_STATE_PLAYING);
+
+  return g_steal_pointer (&receiver);
+}
+
 static void
 test_authentication (void)
 {
   AuthenticationTestData data = { 0 };
   g_autoptr (HwangsaeRelay) relay = hwangsae_relay_new (NULL, 8888, 9999);
   g_autoptr (HwangsaeTestStreamer) stream = hwangsae_test_streamer_new ();
-  g_autofree gchar *uri = NULL;
-  g_autofree gchar *pipeline = NULL;
   g_autoptr (GstElement) receiver = NULL;
   g_autoptr (GError) error = NULL;
 
@@ -412,14 +429,7 @@ test_authentication (void)
     g_main_context_iteration (NULL, FALSE);
   }
 
-  uri = build_source_uri (stream, relay, REJECTED_SRC);
-  pipeline = g_strdup_printf ("srtsrc uri=%s ! fakesink", uri);
-  receiver = gst_parse_launch (pipeline, &error);
-  g_clear_pointer (&uri, g_free);
-  g_clear_pointer (&pipeline, g_free);
-  g_assert_no_error (error);
-
-  gst_element_set_state (receiver, GST_STATE_PLAYING);
+  receiver = make_receiver (stream, relay, REJECTED_SRC);
 
   while (!data.source_rejected) {
     g_main_context_iteration (NULL, FALSE);
@@ -428,12 +438,7 @@ test_authentication (void)
   gst_element_set_state (receiver, GST_STATE_NULL);
   gst_clear_object (&receiver);
 
-  uri = build_source_uri (stream, relay, ACCEPTED_SRC);
-  pipeline = g_strdup_printf ("srtsrc uri=%s ! fakesink", uri);
-  receiver = gst_parse_launch (pipeline, &error);
-  g_assert_no_error (error);
-
-  gst_element_set_state (receiver, GST_STATE_PLAYING);
+  receiver = make_receiver (stream, relay, ACCEPTED_SRC);
 
   while (!data.source_accepted) {
     g_main_context_iteration (NULL, FALSE);
@@ -504,11 +509,126 @@ test_no_auth (void)
   g_idle_add ((GSourceFunc) validate_stream, &data1);
   g_idle_add ((GSourceFunc) validate_stream, &data2);
 
-  while (!data1.done && !data2.done) {
+  while (!data1.done || !data2.done) {
     g_main_context_iteration (NULL, FALSE);
   }
 
   g_debug ("Receiving stream1 validated");
+}
+
+#define MASTER_STREAM_RESOURCE "MyStream"
+#define RECEIVER_USERNAME "MyReceiver"
+
+typedef struct
+{
+  gboolean slave_accepted;
+  gboolean slave_rejected;
+  gboolean receiver_rejected;
+} SlaveTestData;
+
+static void
+_slave_accepted (HwangsaeRelay * relay, HwangsaeCallerDirection direction,
+    GInetSocketAddress * addr, const gchar * username, const gchar * resource,
+    SlaveTestData * data)
+{
+  if (direction == HWANGSAE_CALLER_DIRECTION_SRC) {
+    g_debug ("Slave accepted");
+
+    g_assert_cmpstr (username, ==, ACCEPTED_SRC);
+    g_assert_cmpstr (resource, ==, MASTER_STREAM_RESOURCE);
+
+    data->slave_accepted = TRUE;
+  }
+}
+
+static void
+_slave_rejected (HwangsaeRelay * relay, HwangsaeCallerDirection direction,
+    GInetSocketAddress * addr, const gchar * username, const gchar * resource,
+    SlaveTestData * data)
+{
+  if (direction == HWANGSAE_CALLER_DIRECTION_SRC) {
+    g_debug ("Slave rejected");
+
+    g_assert_cmpstr (username, ==, REJECTED_SRC);
+    g_assert_cmpstr (resource, ==, MASTER_STREAM_RESOURCE);
+
+    data->slave_rejected = TRUE;
+  }
+}
+
+static void
+_receiver_rejected (HwangsaeRelay * relay, HwangsaeCallerDirection direction,
+    GInetSocketAddress * addr, const gchar * username, const gchar * resource,
+    SlaveTestData * data)
+{
+  if (direction == HWANGSAE_CALLER_DIRECTION_SRC) {
+    g_debug ("Receiver rejected");
+
+    g_assert_cmpstr (username, ==, RECEIVER_USERNAME);
+    g_assert_cmpstr (resource, ==, MASTER_STREAM_RESOURCE);
+
+    data->receiver_rejected = TRUE;
+  }
+}
+
+static void
+test_slave (void)
+{
+  g_autoptr (HwangsaeRelay) master = hwangsae_relay_new (NULL, 8888, 9999);
+  g_autoptr (HwangsaeRelay) slave = hwangsae_relay_new (NULL, 18888, 19999);
+  g_autoptr (HwangsaeTestStreamer) stream = hwangsae_test_streamer_new ();
+  g_autoptr (GstElement) receiver = NULL;
+  SlaveTestData data = { 0 };
+  RelayTestData validate_stream_data = { 0 };
+
+  g_object_set (stream, "username", MASTER_STREAM_RESOURCE,
+      "resolution", GAEGULI_VIDEO_RESOLUTION_640X480, NULL);
+
+  g_object_set (master, "authentication", TRUE, NULL);
+  g_signal_connect (master, "authenticate", (GCallback) _authenticate, NULL);
+  g_signal_connect (master, "caller-rejected", (GCallback) _slave_rejected,
+      &data);
+  g_signal_connect (slave, "caller-rejected", (GCallback) _receiver_rejected,
+      &data);
+
+  g_object_set (slave, "authentication", TRUE,
+      "master-uri", hwangsae_relay_get_source_uri (master),
+      "master-username", REJECTED_SRC, NULL);
+
+  hwangsae_relay_start (master);
+  hwangsae_relay_start (slave);
+
+  hwangsae_test_streamer_set_uri (stream, hwangsae_relay_get_sink_uri (master));
+  hwangsae_test_streamer_start (stream);
+
+  receiver = make_receiver (stream, slave, RECEIVER_USERNAME);
+
+  /* Slave relay should get rejected by the master due to its username. */
+  while (!data.receiver_rejected || !data.slave_rejected) {
+    g_main_context_iteration (NULL, FALSE);
+  }
+
+  /* Switch slave's username to the accepted one. Now we should be able to
+   * establish full path stream -> master <- slave <- receiver */
+  g_object_set (slave, "master-username", ACCEPTED_SRC, NULL);
+
+  g_signal_connect (master, "caller-accepted", (GCallback) _slave_accepted,
+      &data);
+
+  while (!data.slave_accepted) {
+    g_main_context_iteration (NULL, FALSE);
+  }
+
+  validate_stream_data.source_uri = build_source_uri (stream, slave,
+      RECEIVER_USERNAME);
+  validate_stream_data.resolution = GAEGULI_VIDEO_RESOLUTION_640X480;
+  g_idle_add ((GSourceFunc) validate_stream, &validate_stream_data);
+
+  while (!validate_stream_data.done) {
+    g_main_context_iteration (NULL, FALSE);
+  }
+
+  gst_element_set_state (receiver, GST_STATE_NULL);
 }
 
 int
@@ -527,6 +647,7 @@ main (int argc, char *argv[])
   g_test_add_func ("/hwangsae/relay-reject-source", test_reject_source);
   g_test_add_func ("/hwangsae/relay-authentication", test_authentication);
   g_test_add_func ("/hwangsae/relay-no-auth", test_no_auth);
+  g_test_add_func ("/hwangsae/relay-slave", test_slave);
 
   return g_test_run ();
 }
