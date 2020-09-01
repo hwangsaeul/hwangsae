@@ -25,3 +25,7 @@ gboolean         hwangsae_common_parse_times_from_filename
                                                (const gchar *filename,
                                                 guint64     *start_time,
                                                 guint64     *end_time);
+
+gboolean         hwangsae_common_parse_srt_uri (const gchar  *uri,
+                                                gchar       **host,
+                                                guint        *port);

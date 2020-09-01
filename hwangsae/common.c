@@ -125,3 +125,65 @@ out:
 
   return result;
 }
+
+static char
+_search_delimiter (const char *from, guint * position)
+{
+  *position = 0;
+
+  for (;;) {
+    char ch = *from++;
+    (*position)++;
+
+    switch (ch) {
+      case ':':
+      case 0:
+      case '/':
+      case '?':
+      case '#':
+      case '=':
+        return ch;
+      default:
+        break;
+    }
+  }
+
+  return 0;
+}
+
+gboolean
+hwangsae_common_parse_srt_uri (const gchar * uri, gchar ** host, guint * port)
+{
+  gchar delimiter = 0;
+  g_autofree gchar *port_str = NULL;
+  guint position = 0;
+
+  g_return_val_if_fail (uri != NULL, FALSE);
+  g_return_val_if_fail (host != NULL, FALSE);
+  g_return_val_if_fail (port != NULL, FALSE);
+  g_return_val_if_fail (strncmp (uri, "srt://", 6) == 0, FALSE);
+
+  if (!strncmp (uri, "srt://", 6)) {
+    uri += 6;
+  }
+
+  delimiter = _search_delimiter (uri, &position);
+  *host = g_strndup (uri, position - 1);
+
+  if (delimiter == ':') {
+    uri += position;
+    delimiter = _search_delimiter (uri, &position);
+    port_str = g_strndup (uri, position - 1);
+  }
+
+  if (port_str) {
+    gchar *end = NULL;
+    *port = strtol (port_str, &end, 10);
+
+    if (port_str == end || *end != 0 || *port < 0 || *port > 65535) {
+      return FALSE;
+    }
+  }
+
+  return TRUE;
+}
