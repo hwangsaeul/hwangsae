@@ -531,7 +531,7 @@ hwangsae_relay_accept_source (HwangsaeRelay * self, SRTSOCKET sock,
     }
 
     g_signal_emit (self, signals[SIG_AUTHENTICATE], 0,
-        HWANGSAE_CALLER_DIRECTION_SINK, addr, username, resource,
+        HWANGSAE_CALLER_DIRECTION_SRC, addr, username, resource,
         &authenticated);
 
     if (!authenticated) {

@@ -305,8 +305,10 @@ test_reject_source (void)
   gst_element_set_state (receiver, GST_STATE_NULL);
 }
 
-static const gchar *ACCEPTED_USERNAME = "ValidName";
-static const gchar *REJECTED_USERNAME = "YouShallNotPass";
+static const gchar *ACCEPTED_SINK = "AcceptedSink";
+static const gchar *REJECTED_SINK = "RejectedSink";
+static const gchar *ACCEPTED_SRC = "AcceptedSrc";
+static const gchar *REJECTED_SRC = "RejectedSrc";
 
 typedef struct
 {
@@ -321,7 +323,16 @@ _authenticate (HwangsaeRelay * relay, HwangsaeCallerDirection direction,
     GSocketAddress * addr, const gchar * username, const gchar * resource,
     gpointer data)
 {
-  return g_strcmp0 (username, REJECTED_USERNAME);
+  switch (direction) {
+    case HWANGSAE_CALLER_DIRECTION_SINK:
+      return g_strcmp0 (username, REJECTED_SINK);
+      break;
+    case HWANGSAE_CALLER_DIRECTION_SRC:
+      return g_strcmp0 (username, REJECTED_SRC);
+      break;
+    default:
+      g_assert_not_reached ();
+  }
 }
 
 static void
@@ -329,20 +340,16 @@ _caller_accepted (HwangsaeRelay * relay, HwangsaeCallerDirection direction,
     GSocketAddress * addr, const gchar * username, const gchar * resource,
     AuthenticationTestData * data)
 {
-  if (!g_strcmp0 (username, ACCEPTED_USERNAME)) {
-    switch (direction) {
-      case HWANGSAE_CALLER_DIRECTION_SINK:
-        data->sink_accepted = TRUE;
-        break;
-      case HWANGSAE_CALLER_DIRECTION_SRC:
-        data->source_accepted = TRUE;
-        break;
-    }
-
-    return;
+  switch (direction) {
+    case HWANGSAE_CALLER_DIRECTION_SINK:
+      data->sink_accepted = !g_strcmp0 (username, ACCEPTED_SINK);
+      break;
+    case HWANGSAE_CALLER_DIRECTION_SRC:
+      data->source_accepted = !g_strcmp0 (username, ACCEPTED_SRC);
+      break;
+    default:
+      g_assert_not_reached ();
   }
-
-  g_assert_not_reached ();
 }
 
 static void
@@ -350,20 +357,16 @@ _caller_rejected (HwangsaeRelay * relay, HwangsaeCallerDirection direction,
     GSocketAddress * addr, const gchar * username, const gchar * resource,
     AuthenticationTestData * data)
 {
-  if (!g_strcmp0 (username, REJECTED_USERNAME)) {
-    switch (direction) {
-      case HWANGSAE_CALLER_DIRECTION_SINK:
-        data->sink_rejected = TRUE;
-        break;
-      case HWANGSAE_CALLER_DIRECTION_SRC:
-        data->source_rejected = TRUE;
-        break;
-    }
-
-    return;
+  switch (direction) {
+    case HWANGSAE_CALLER_DIRECTION_SINK:
+      data->sink_rejected = !g_strcmp0 (username, REJECTED_SINK);
+      break;
+    case HWANGSAE_CALLER_DIRECTION_SRC:
+      data->source_rejected = !g_strcmp0 (username, REJECTED_SRC);
+      break;
+    default:
+      g_assert_not_reached ();
   }
-
-  g_assert_not_reached ();
 }
 
 static void
@@ -378,7 +381,7 @@ test_authentication (void)
   g_autoptr (GError) error = NULL;
 
   g_object_set (relay, "authentication", TRUE, NULL);
-  g_object_set (stream, "username", REJECTED_USERNAME, NULL);
+  g_object_set (stream, "username", REJECTED_SINK, NULL);
 
   g_signal_connect (relay, "caller-accepted", (GCallback) _caller_accepted,
       &data);
@@ -394,14 +397,14 @@ test_authentication (void)
   }
 
   hwangsae_test_streamer_stop (stream);
-  g_object_set (stream, "username", ACCEPTED_USERNAME, NULL);
+  g_object_set (stream, "username", ACCEPTED_SINK, NULL);
   hwangsae_test_streamer_start (stream);
 
   while (!data.sink_accepted) {
     g_main_context_iteration (NULL, FALSE);
   }
 
-  uri = build_source_uri (stream, relay, REJECTED_USERNAME);
+  uri = build_source_uri (stream, relay, REJECTED_SRC);
   pipeline = g_strdup_printf ("srtsrc uri=%s ! fakesink", uri);
   receiver = gst_parse_launch (pipeline, &error);
   g_clear_pointer (&uri, g_free);
@@ -417,7 +420,7 @@ test_authentication (void)
   gst_element_set_state (receiver, GST_STATE_NULL);
   gst_clear_object (&receiver);
 
-  uri = build_source_uri (stream, relay, ACCEPTED_USERNAME);
+  uri = build_source_uri (stream, relay, ACCEPTED_SRC);
   pipeline = g_strdup_printf ("srtsrc uri=%s ! fakesink", uri);
   receiver = gst_parse_launch (pipeline, &error);
   g_assert_no_error (error);
