@@ -22,8 +22,8 @@
 #include <glib/gstdio.h>
 
 #include "hwangsae/hwangsae.h"
-#include "common/test.h"
-#include "common/test-streamer.h"
+#include "hwangsae/test/test.h"
+#include "hwangsae/test/test-streamer.h"
 
 typedef struct
 {

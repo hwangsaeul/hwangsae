@@ -47,3 +47,24 @@ Depends:
  ${shlibs:Depends},
 Description: SRT relay and recording API
  A set of library for SRT relay and recording.
+
+Package: libhwangsae-test-common2
+Architecture: any
+Depends:
+ libhwangsae2 (= ${binary:Version}),
+ ${misc:Depends},
+ ${shlibs:Depends},
+Description: Hwangsae test library
+ A library of ancillary methods for writing tests that involve Hwangsae.
+
+Package: libhwangsae-test-common-dev
+Section: libdevel
+Architecture: any
+Depends:
+ libhwangsae-test-common2 (= ${binary:Version}),
+ ${misc:Depends},
+ ${shlibs:Depends},
+Description: Hwangsae test library (development files)
+ A library of ancillary methods for writing tests that involve Hwangsae.
+ .
+ This package contains development files for the library.

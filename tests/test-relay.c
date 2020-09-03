@@ -20,7 +20,7 @@
 
 #include "hwangsae/common.h"
 #include "hwangsae/hwangsae.h"
-#include "common/test-streamer.h"
+#include "hwangsae/test/test-streamer.h"
 
 #include <gaeguli/gaeguli.h>
 #include <gio/gio.h>

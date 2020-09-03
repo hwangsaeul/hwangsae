@@ -1,3 +1,4 @@
-usr/include
-usr/lib/*/libhwangsae-*.so
-usr/lib/*/pkgconfig/*
+usr/include/*/hwangsae/*.h
+usr/lib/*/libhwangsae-2.0.so
+usr/lib/*/libhwangsae-dbus-2.0.so
+usr/lib/*/pkgconfig/hwangsae-2.0.pc

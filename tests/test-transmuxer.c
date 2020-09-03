@@ -19,8 +19,7 @@
  */
 
 #include "hwangsae/hwangsae.h"
-
-#include "common/test.h"
+#include "hwangsae/test/test.h"
 
 #include <glib/gstdio.h>
 #include <gst/gstclock.h>
