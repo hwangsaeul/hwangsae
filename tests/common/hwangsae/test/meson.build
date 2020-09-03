@@ -4,15 +4,19 @@ sources = [
 ]
 
 headers = [
+  'test.h',
   'test-streamer.h',
 ]
+
+libhwangsae_test_common_includes = include_directories('../..')
 
 libhwangsae_test_common = library(
   'hwangsae-test-common-@0@'.format(apiversion),
   sources,
   version: libversion,
   soversion: soversion,
-  dependencies: [ glib_dep, gaeguli_dep, gstreamer_pbutils_dep ],
+  include_directories: libhwangsae_test_common_includes,
+  dependencies: [ glib_dep, gaeguli_dep, gstreamer_pbutils_dep, libhwangsae_dep ],
   c_args: test_c_args,
   install: true
 )
@@ -25,5 +29,5 @@ pkg.generate(libhwangsae_test_common,
 
 libhwangsae_test_common_dep = declare_dependency(
   link_with: libhwangsae_test_common,
-  include_directories: [ include_directories('../..') ],
+  include_directories: libhwangsae_test_common_includes,
 )

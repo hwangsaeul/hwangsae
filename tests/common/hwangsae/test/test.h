@@ -22,11 +22,21 @@
 #define __HWANGSAE_TEST_H__
 
 #include <gst/gst.h>
+#include <hwangsae/hwangsae.h>
+#include <hwangsae/test/test-streamer.h>
 
 G_BEGIN_DECLS
 
 GstClockTime          hwangsae_test_get_file_duration (const gchar * file_path);
 GstClockTimeDiff      hwangsae_test_get_gap_duration  (const gchar * file_path);
+
+gchar                *hwangsae_test_build_source_uri  (HwangsaeTestStreamer * streamer,
+                                                       HwangsaeRelay        * relay,
+                                                       const gchar          * username);
+
+GstElement           *hwangsae_test_make_receiver     (HwangsaeTestStreamer * streamer,
+                                                       HwangsaeRelay        * relay,
+                                                       const gchar          * username);
 
 G_END_DECLS
 

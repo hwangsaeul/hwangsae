@@ -20,14 +20,11 @@
 
 #include "hwangsae/common.h"
 #include "hwangsae/hwangsae.h"
-#include "hwangsae/test/test-streamer.h"
+#include "hwangsae/test/test.h"
 
 #include <gaeguli/gaeguli.h>
 #include <gio/gio.h>
 #include <gst/pbutils/gstdiscoverer.h>
-
-static gchar *build_source_uri (HwangsaeTestStreamer * streamer,
-    HwangsaeRelay * relay, const gchar * username);
 
 static void
 test_relay_instance (void)
@@ -149,7 +146,7 @@ test_1_to_n (void)
 
   g_object_set (relay, "authentication", TRUE, NULL);
 
-  source_uri = build_source_uri (streamer, relay, NULL);
+  source_uri = hwangsae_test_build_source_uri (streamer, relay, NULL);
   data1.source_uri = data2.source_uri = source_uri;
   data1.resolution = data2.resolution = GAEGULI_VIDEO_RESOLUTION_640X480;
 
@@ -166,23 +163,6 @@ test_1_to_n (void)
   while (!data1.done && !data2.done) {
     g_main_context_iteration (NULL, FALSE);
   }
-}
-
-static gchar *
-build_source_uri (HwangsaeTestStreamer * streamer, HwangsaeRelay * relay,
-    const gchar * username)
-{
-  g_autofree gchar *streamid = NULL;
-  g_autofree gchar *source_uri = NULL;
-  g_autofree gchar *stream_caps_str = NULL;
-  const gchar *resource;
-
-  g_object_get (streamer, "username", &resource, NULL);
-  streamid = g_strdup_printf ("#!::u=%s,r=%s", username, resource);
-  streamid = g_uri_escape_string (streamid, NULL, FALSE);
-
-  return g_strdup_printf ("%s?streamid=%s",
-      hwangsae_relay_get_source_uri (relay), streamid);
 }
 
 static void
@@ -202,13 +182,15 @@ test_m_to_n (void)
       hwangsae_relay_get_sink_uri (relay));
   data1.resolution = GAEGULI_VIDEO_RESOLUTION_640X480;
   g_object_set (streamer1, "resolution", data1.resolution, NULL);
-  data1.source_uri = source_uri1 = build_source_uri (streamer1, relay, NULL);
+  data1.source_uri = source_uri1 =
+      hwangsae_test_build_source_uri (streamer1, relay, NULL);
 
   hwangsae_test_streamer_set_uri (streamer2,
       hwangsae_relay_get_sink_uri (relay));
   data2.resolution = GAEGULI_VIDEO_RESOLUTION_1920X1080;
   g_object_set (streamer2, "resolution", data2.resolution, NULL);
-  data2.source_uri = source_uri2 = build_source_uri (streamer2, relay, NULL);
+  data2.source_uri = source_uri2 =
+      hwangsae_test_build_source_uri (streamer2, relay, NULL);
 
   hwangsae_relay_start (relay);
   hwangsae_test_streamer_start (streamer1);
@@ -375,25 +357,6 @@ _caller_rejected (HwangsaeRelay * relay, HwangsaeCallerDirection direction,
   }
 }
 
-static GstElement *
-make_receiver (HwangsaeTestStreamer * streamer, HwangsaeRelay * relay,
-    const gchar * username)
-{
-  g_autofree gchar *uri = NULL;
-  g_autofree gchar *pipeline = NULL;
-  g_autoptr (GstElement) receiver = NULL;
-  g_autoptr (GError) error = NULL;
-
-  uri = build_source_uri (streamer, relay, username);
-  pipeline = g_strdup_printf ("srtsrc uri=%s ! fakesink", uri);
-  receiver = gst_parse_launch (pipeline, &error);
-  g_assert_no_error (error);
-
-  gst_element_set_state (receiver, GST_STATE_PLAYING);
-
-  return g_steal_pointer (&receiver);
-}
-
 static void
 test_authentication (void)
 {
@@ -429,7 +392,7 @@ test_authentication (void)
     g_main_context_iteration (NULL, FALSE);
   }
 
-  receiver = make_receiver (stream, relay, REJECTED_SRC);
+  receiver = hwangsae_test_make_receiver (stream, relay, REJECTED_SRC);
 
   while (!data.source_rejected) {
     g_main_context_iteration (NULL, FALSE);
@@ -438,7 +401,7 @@ test_authentication (void)
   gst_element_set_state (receiver, GST_STATE_NULL);
   gst_clear_object (&receiver);
 
-  receiver = make_receiver (stream, relay, ACCEPTED_SRC);
+  receiver = hwangsae_test_make_receiver (stream, relay, ACCEPTED_SRC);
 
   while (!data.source_accepted) {
     g_main_context_iteration (NULL, FALSE);
@@ -469,7 +432,7 @@ test_no_auth (void)
 
   data1.resolution = data2.resolution = GAEGULI_VIDEO_RESOLUTION_640X480;
   data1.source_uri = data2.source_uri = source_uri =
-      build_source_uri (stream1, relay, NULL);
+      hwangsae_test_build_source_uri (stream1, relay, NULL);
 
   g_object_set (relay, "authentication", FALSE, NULL);
 
@@ -601,7 +564,7 @@ test_slave (void)
   hwangsae_test_streamer_set_uri (stream, hwangsae_relay_get_sink_uri (master));
   hwangsae_test_streamer_start (stream);
 
-  receiver = make_receiver (stream, slave, RECEIVER_USERNAME);
+  receiver = hwangsae_test_make_receiver (stream, slave, RECEIVER_USERNAME);
 
   /* Slave relay should get rejected by the master due to its username. */
   while (!data.receiver_rejected || !data.slave_rejected) {
@@ -619,8 +582,8 @@ test_slave (void)
     g_main_context_iteration (NULL, FALSE);
   }
 
-  validate_stream_data.source_uri = build_source_uri (stream, slave,
-      RECEIVER_USERNAME);
+  validate_stream_data.source_uri =
+      hwangsae_test_build_source_uri (stream, slave, RECEIVER_USERNAME);
   validate_stream_data.resolution = GAEGULI_VIDEO_RESOLUTION_640X480;
   g_idle_add ((GSourceFunc) validate_stream, &validate_stream_data);
 
