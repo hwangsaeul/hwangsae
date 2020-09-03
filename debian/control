@@ -10,7 +10,6 @@ Build-Depends:
  libgstreamer1.0-dev,
  libjson-glib-dev,
  libsoup2.4-dev,
- libsrt-dev,
  meson,
  pkg-config,
 Standards-Version: 4.2.1
