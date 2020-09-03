@@ -1,0 +1,3 @@
+usr/include/*/hwangsae/test
+usr/lib/*/libhwangsae-test-common*.so
+usr/lib/*/pkgconfig/hwangsae-test-common-2.0.pc
