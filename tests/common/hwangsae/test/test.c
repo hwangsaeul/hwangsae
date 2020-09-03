@@ -158,3 +158,39 @@ hwangsae_test_get_gap_duration (const gchar * file_path)
 
   return GST_CLOCK_DIFF (data.gap_start, data.gap_end);
 }
+
+gchar *
+hwangsae_test_build_source_uri (HwangsaeTestStreamer * streamer,
+    HwangsaeRelay * relay, const gchar * username)
+{
+  g_autofree gchar *streamid = NULL;
+  g_autofree gchar *source_uri = NULL;
+  g_autofree gchar *stream_caps_str = NULL;
+  const gchar *resource;
+
+  g_object_get (streamer, "username", &resource, NULL);
+  streamid = g_strdup_printf ("#!::u=%s,r=%s", username, resource);
+  streamid = g_uri_escape_string (streamid, NULL, FALSE);
+
+  return g_strdup_printf ("%s?streamid=%s",
+      hwangsae_relay_get_source_uri (relay), streamid);
+}
+
+GstElement *
+hwangsae_test_make_receiver (HwangsaeTestStreamer * streamer,
+    HwangsaeRelay * relay, const gchar * username)
+{
+  g_autofree gchar *uri = NULL;
+  g_autofree gchar *pipeline = NULL;
+  g_autoptr (GstElement) receiver = NULL;
+  g_autoptr (GError) error = NULL;
+
+  uri = hwangsae_test_build_source_uri (streamer, relay, username);
+  pipeline = g_strdup_printf ("srtsrc uri=%s ! fakesink", uri);
+  receiver = gst_parse_launch (pipeline, &error);
+  g_assert_no_error (error);
+
+  gst_element_set_state (receiver, GST_STATE_PLAYING);
+
+  return g_steal_pointer (&receiver);
+}
