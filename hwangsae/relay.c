@@ -632,9 +632,11 @@ hwangsae_relay_accept_source (HwangsaeRelay * self, SRTSOCKET sock,
       goto reject;
     }
 
-    g_signal_emit (self, signals[SIG_AUTHENTICATE], 0,
-        HWANGSAE_CALLER_DIRECTION_SRC, addr, username, resource,
-        &authenticated);
+    if (self->authentication) {
+      g_signal_emit (self, signals[SIG_AUTHENTICATE], 0,
+          HWANGSAE_CALLER_DIRECTION_SRC, addr, username, resource,
+          &authenticated);
+    }
 
     if (!authenticated) {
       goto reject;
