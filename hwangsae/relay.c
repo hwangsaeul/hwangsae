@@ -533,6 +533,9 @@ hwangsae_relay_accept_sink (HwangsaeRelay * self, SRTSOCKET sock,
   gchar *username = NULL;
   g_autofree gchar *resource = NULL;
   SinkConnection *sink;
+  g_autofree gchar *ip =
+      g_inet_address_to_string (g_inet_socket_address_get_address
+      (G_INET_SOCKET_ADDRESS (addr)));
 
   {
     gboolean authenticated;
@@ -563,7 +566,7 @@ hwangsae_relay_accept_sink (HwangsaeRelay * self, SRTSOCKET sock,
       goto reject;
     }
 
-    g_debug ("Accepting sink %d username: %s", sock, username);
+    g_debug ("Accepting sink %d username: %s from %s", sock, username, ip);
 
     sink = g_new0 (SinkConnection, 1);
     sink->socket = sock;
@@ -600,6 +603,9 @@ hwangsae_relay_accept_source (HwangsaeRelay * self, SRTSOCKET sock,
   g_autofree gchar *resource_autofree = NULL;
   gchar *resource = NULL;
   SinkConnection *sink = NULL;
+  g_autofree gchar *ip =
+      g_inet_address_to_string (g_inet_socket_address_get_address
+      (G_INET_SOCKET_ADDRESS (addr)));
 
   {
     gboolean authenticated = TRUE;
@@ -664,7 +670,7 @@ hwangsae_relay_accept_source (HwangsaeRelay * self, SRTSOCKET sock,
       srt_epoll_add_usock (self->poll_id, sink->socket, &SRT_POLL_EVENTS);
     }
 
-    g_debug ("Accepting source %d", sock);
+    g_debug ("Accepting source %d from %s", sock, ip);
 
     sink->sources = g_slist_append (sink->sources, GINT_TO_POINTER (sock));
   }
