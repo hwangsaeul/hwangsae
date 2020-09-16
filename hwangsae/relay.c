@@ -795,6 +795,7 @@ _relay_main (gpointer data)
                   hwangsae_relay_emit_io_error_locked (self, source_socket,
                       HWANGSAE_RELAY_ERROR_WRITE, "srt_send failed: %s",
                       srt_strerror (srt_getlasterror (NULL), 0));
+                  _sink_connection_remove_source (sink, source_socket);
                 }
               }
             } else if (recv < 0) {
