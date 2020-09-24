@@ -56,7 +56,7 @@ hwangsae_test_streamer_thread_func (HwangsaeTestStreamer * self)
   g_autoptr (GstUri) uri = NULL;
   const gchar *mode_str;
   GaeguliSRTMode mode = GAEGULI_SRT_MODE_UNKNOWN;
-  guint target_id;
+  GaeguliTarget *target;
 
   g_main_context_push_thread_default (context);
 
@@ -70,7 +70,7 @@ hwangsae_test_streamer_thread_func (HwangsaeTestStreamer * self)
   }
   g_assert (mode != GAEGULI_SRT_MODE_UNKNOWN);
 
-  target_id = gaeguli_pipeline_add_srt_target_full (self->pipeline,
+  target = gaeguli_pipeline_add_srt_target_full (self->pipeline,
       GAEGULI_VIDEO_CODEC_H264, self->resolution, 30, 2048000,
       self->uri, self->username, &error);
   g_assert_no_error (error);
@@ -79,7 +79,7 @@ hwangsae_test_streamer_thread_func (HwangsaeTestStreamer * self)
     g_main_context_iteration (context, FALSE);
   }
 
-  gaeguli_pipeline_remove_target (self->pipeline, target_id, &error);
+  gaeguli_pipeline_remove_target (self->pipeline, target, &error);
   g_assert_no_error (error);
 
   return TRUE;
