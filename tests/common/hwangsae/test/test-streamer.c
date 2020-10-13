@@ -71,7 +71,7 @@ hwangsae_test_streamer_thread_func (HwangsaeTestStreamer * self)
   g_assert (mode != GAEGULI_SRT_MODE_UNKNOWN);
 
   target = gaeguli_pipeline_add_srt_target_full (self->pipeline,
-      GAEGULI_VIDEO_CODEC_H264, self->resolution, 30, 2048000,
+      GAEGULI_VIDEO_CODEC_H264_X264, self->resolution, 30, 2048000,
       self->uri, self->username, &error);
   g_assert_no_error (error);
 
@@ -122,7 +122,7 @@ hwangsae_test_streamer_init (HwangsaeTestStreamer * self)
   self->uri = g_strdup ("srt://127.0.0.1:8888?mode=listener");
   self->username = g_strdup_printf ("HwangsaeTestStreamer_%p", self);
   self->pipeline = gaeguli_pipeline_new_full (GAEGULI_VIDEO_SOURCE_VIDEOTESTSRC,
-      NULL, GAEGULI_ENCODING_METHOD_GENERAL);
+      NULL);
 
   g_object_set (self->pipeline, "clock-overlay", TRUE, NULL);
 }
