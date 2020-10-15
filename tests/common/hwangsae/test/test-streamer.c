@@ -75,6 +75,9 @@ hwangsae_test_streamer_thread_func (HwangsaeTestStreamer * self)
       &error);
   g_assert_no_error (error);
 
+  gaeguli_target_start (target, &error);
+  g_assert_no_error (error);
+
   while (self->should_stream) {
     g_main_context_iteration (context, FALSE);
   }
