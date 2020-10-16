@@ -88,6 +88,9 @@ struct _HwangsaeRelay
 
   GThread *relay_thread;
   gboolean run_relay_thread;
+
+  gint sink_latency;
+  gint src_latency;
 };
 
 static guint hwangsae_relay_init_refcnt = 0;
@@ -737,6 +740,11 @@ _relay_main (gpointer data)
     srt_epoll_add_usock (self->poll_id, self->sink_listen_sock,
         &SRT_POLL_EVENTS);
 
+    if (srt_setsockflag (self->sink_listen_sock, SRTO_LATENCY,
+            &self->sink_latency, sizeof (gint))) {
+      g_error ("%s", srt_getlasterror_str ());
+    }
+
     g_debug ("URI for sink connection is %s",
         hwangsae_relay_get_sink_uri (self));
   }
@@ -746,6 +754,11 @@ _relay_main (gpointer data)
       (srt_listen_callback_fn *) hwangsae_relay_accept_source, self);
   srt_epoll_add_usock (self->poll_id, self->source_listen_sock,
       &SRT_POLL_EVENTS);
+
+  if (srt_setsockflag (self->source_listen_sock, SRTO_LATENCY,
+          &self->src_latency, sizeof (gint))) {
+    g_error ("%s", srt_getlasterror_str ());
+  }
 
   while (self->run_relay_thread) {
     gint rnum = G_N_ELEMENTS (readfds);
@@ -892,4 +905,19 @@ hwangsae_relay_get_source_uri (HwangsaeRelay * self)
   }
 
   return self->source_uri;
+}
+
+void
+hwangsae_relay_set_latency (HwangsaeRelay * self,
+    HwangsaeCallerDirection direction, gint latency)
+{
+  g_return_if_fail (HWANGSAE_IS_RELAY (self));
+
+  if (direction == HWANGSAE_CALLER_DIRECTION_SINK) {
+    self->sink_latency = latency;
+  } else if (direction == HWANGSAE_CALLER_DIRECTION_SRC) {
+    self->src_latency = latency;
+  } else {
+    g_warning ("Invalid direction is requested.");
+  }
 }

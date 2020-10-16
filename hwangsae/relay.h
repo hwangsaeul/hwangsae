@@ -25,6 +25,8 @@
 
 #include <glib-object.h>
 
+#include <hwangsae/types.h>
+
 /**
  * SECTION: relay
  * @Title: HwangsaeRelay
@@ -52,6 +54,11 @@ HwangsaeRelay          *hwangsae_relay_new              (const gchar   *external
                                                          guint          sink_port,
                                                          guint          source_port);
 
+void                    hwangsae_relay_set_latency      (HwangsaeRelay *relay,
+                                                         HwangsaeCallerDirection
+                                                                        direction,
+                                                         gint           latency);
+                                                                        
 /**
  * hwangsae_relay_start:
  * @relay: a HwangsaeRelay object
