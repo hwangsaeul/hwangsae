@@ -119,6 +119,7 @@ enum
   SIG_CALLER_REJECTED,
   SIG_IO_ERROR,
   SIG_AUTHENTICATE,
+  SIG_ON_PASSPHRASE_ASKED,
   LAST_SIGNAL
 };
 
@@ -457,6 +458,12 @@ hwangsae_relay_class_init (HwangsaeRelayClass * klass)
       _authentication_accumulator, NULL, NULL,
       G_TYPE_BOOLEAN, 4, HWANGSAE_TYPE_CALLER_DIRECTION, G_TYPE_SOCKET_ADDRESS,
       G_TYPE_STRING, G_TYPE_STRING);
+
+  signals[SIG_ON_PASSPHRASE_ASKED] =
+      g_signal_new ("on-passphrase-asked", G_TYPE_FROM_CLASS (klass),
+      G_SIGNAL_RUN_LAST, 0, g_signal_accumulator_first_wins, NULL, NULL,
+      G_TYPE_STRING, 4, HWANGSAE_TYPE_CALLER_DIRECTION, G_TYPE_SOCKET_ADDRESS,
+      G_TYPE_STRING, G_TYPE_STRING);
 }
 
 const gchar STREAM_ID_PREFIX[] = "#!::";
@@ -526,6 +533,25 @@ _peeraddr_to_g_socket_address (const struct sockaddr *peeraddr)
   return g_socket_address_new_from_native ((gpointer) peeraddr, peeraddr_len);
 }
 
+static gboolean
+hwangsae_relay_set_socket_encryption (HwangsaeRelay * self, SRTSOCKET sock,
+    HwangsaeCallerDirection direction, const GSocketAddress * addr,
+    const gchar * username, const gchar * resource)
+{
+  g_autofree gchar *passphrase = NULL;
+
+  g_signal_emit (self, signals[SIG_ON_PASSPHRASE_ASKED], 0, direction, addr,
+      username, resource, &passphrase);
+
+  if (passphrase && srt_setsockflag (sock, SRTO_PASSPHRASE, passphrase,
+          strlen (passphrase))) {
+    g_warning ("Failed to set passphrase: %s", srt_getlasterror_str ());
+    return FALSE;
+  }
+
+  return TRUE;
+}
+
 static gint
 hwangsae_relay_authenticate_sink (HwangsaeRelay * self, SRTSOCKET sock,
     gint hs_version, const struct sockaddr *peeraddr, const gchar * stream_id)
@@ -563,6 +589,11 @@ hwangsae_relay_authenticate_sink (HwangsaeRelay * self, SRTSOCKET sock,
       /* When authentication is off, only one sink can connect. */
       goto reject;
     }
+  }
+
+  if (!hwangsae_relay_set_socket_encryption (self, sock,
+          HWANGSAE_CALLER_DIRECTION_SINK, addr, username, resource)) {
+    goto reject;
   }
 
   return 0;
@@ -693,6 +724,11 @@ hwangsae_relay_authenticate_source (HwangsaeRelay * self, SRTSOCKET sock,
     if (!authenticated) {
       goto reject;
     }
+  }
+
+  if (!hwangsae_relay_set_socket_encryption (self, sock,
+          HWANGSAE_CALLER_DIRECTION_SINK, addr, username, resource)) {
+    goto reject;
   }
 
   return 0;
