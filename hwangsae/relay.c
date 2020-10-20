@@ -527,18 +527,13 @@ _peeraddr_to_g_socket_address (const struct sockaddr *peeraddr)
 }
 
 static gint
-hwangsae_relay_accept_sink (HwangsaeRelay * self, SRTSOCKET sock,
+hwangsae_relay_authenticate_sink (HwangsaeRelay * self, SRTSOCKET sock,
     gint hs_version, const struct sockaddr *peeraddr, const gchar * stream_id)
 {
-  guint result = 0;
   g_autoptr (GSocketAddress) addr = _peeraddr_to_g_socket_address (peeraddr);
   g_autofree gchar *username_autofree = NULL;
   gchar *username = NULL;
   g_autofree gchar *resource = NULL;
-  SinkConnection *sink;
-  g_autofree gchar *ip =
-      g_inet_address_to_string (g_inet_socket_address_get_address
-      (G_INET_SOCKET_ADDRESS (addr)));
 
   {
     gboolean authenticated;
@@ -568,43 +563,92 @@ hwangsae_relay_accept_sink (HwangsaeRelay * self, SRTSOCKET sock,
       /* When authentication is off, only one sink can connect. */
       goto reject;
     }
-
-    g_debug ("Accepting sink %d username: %s from %s", sock, username, ip);
-
-    sink = g_new0 (SinkConnection, 1);
-    sink->socket = sock;
-    sink->username = g_steal_pointer (&username_autofree);
-
-    g_hash_table_insert (self->srtsocket_sink_map, &sink->socket, sink);
-    if (sink->username) {
-      g_hash_table_insert (self->username_sink_map, sink->username, sink);
-    }
-
-    srt_epoll_add_usock (self->poll_id, sock, &SRT_POLL_EVENTS);
   }
 
-  goto accept;
+  return 0;
 
 reject:
-  result = -1;
+  g_signal_emit (self, signals[SIG_CALLER_REJECTED], 0,
+      HWANGSAE_CALLER_DIRECTION_SINK, addr, username, resource);
 
-accept:
-  g_signal_emit (self,
-      signals[(result == 0) ? SIG_CALLER_ACCEPTED : SIG_CALLER_REJECTED],
-      0, HWANGSAE_CALLER_DIRECTION_SINK, addr, username, resource);
+  return -1;
+}
 
-  return result;
+static SRTSOCKET
+_srt_accept (SRTSOCKET listen_socket, GSocketAddress ** peeraddr,
+    gchar ** username, gchar ** resource)
+{
+  union
+  {
+    struct sockaddr_storage ss;
+    struct sockaddr sa;
+  } peer_sa;
+  int peer_sa_len = sizeof (peer_sa);
+  SRTSOCKET sock;
+  gchar stream_id[512];
+  gint optlen = sizeof (stream_id);
+
+  sock = srt_accept (listen_socket, &peer_sa.sa, &peer_sa_len);
+
+  if (srt_getsockflag (sock, SRTO_STREAMID, &stream_id, &optlen)) {
+    g_warning ("Couldn't read stream ID: %s", srt_getlasterror_str ());
+    return SRT_INVALID_SOCK;
+  }
+
+  _parse_stream_id (stream_id, username, resource);
+
+  if (peeraddr) {
+    *peeraddr = _peeraddr_to_g_socket_address (&peer_sa.sa);
+  }
+
+  return sock;
+}
+
+static void
+hwangsae_relay_accept_sink (HwangsaeRelay * self)
+{
+  g_autoptr (GSocketAddress) addr = NULL;
+  g_autofree gchar *username = NULL;
+  g_autofree gchar *resource = NULL;
+  SinkConnection *sink;
+  SRTSOCKET sock;
+
+  sock = _srt_accept (self->sink_listen_sock, &addr, &username, &resource);
+  if (sock == SRT_INVALID_SOCK) {
+    return;
+  }
+
+  sink = g_new0 (SinkConnection, 1);
+  sink->socket = sock;
+  sink->username = g_steal_pointer (&username);
+
+  {
+    g_autofree gchar *ip =
+        g_inet_address_to_string (g_inet_socket_address_get_address
+        (G_INET_SOCKET_ADDRESS (addr)));
+
+    g_debug ("Accepting sink %d username: %s from %s", sock, sink->username,
+        ip);
+  }
+
+  g_hash_table_insert (self->srtsocket_sink_map, &sink->socket, sink);
+  if (sink->username) {
+    g_hash_table_insert (self->username_sink_map, sink->username, sink);
+  }
+
+  srt_epoll_add_usock (self->poll_id, sock, &SRT_POLL_EVENTS);
+
+  g_signal_emit (self, signals[SIG_CALLER_ACCEPTED],
+      0, HWANGSAE_CALLER_DIRECTION_SINK, addr, sink->username, resource);
 }
 
 static gint
-hwangsae_relay_accept_source (HwangsaeRelay * self, SRTSOCKET sock,
+hwangsae_relay_authenticate_source (HwangsaeRelay * self, SRTSOCKET sock,
     gint hs_version, const struct sockaddr *peeraddr, const gchar * stream_id)
 {
-  guint result = 0;
   g_autoptr (GSocketAddress) addr = _peeraddr_to_g_socket_address (peeraddr);
   g_autofree gchar *username = NULL;
-  g_autofree gchar *resource_autofree = NULL;
-  gchar *resource = NULL;
+  g_autofree gchar *resource = NULL;
   SinkConnection *sink = NULL;
   g_autofree gchar *ip =
       g_inet_address_to_string (g_inet_socket_address_get_address
@@ -617,7 +661,6 @@ hwangsae_relay_accept_source (HwangsaeRelay * self, SRTSOCKET sock,
 
     if (self->authentication) {
       _parse_stream_id (stream_id, &username, &resource);
-      resource_autofree = resource;
 
       if (!resource) {
         // Source socket must specify ID of the sink stream it wants to receive.
@@ -650,12 +693,37 @@ hwangsae_relay_accept_source (HwangsaeRelay * self, SRTSOCKET sock,
     if (!authenticated) {
       goto reject;
     }
+  }
 
-    if (!sink) {
+  return 0;
+
+reject:
+  g_signal_emit (self, signals[SIG_CALLER_REJECTED], 0,
+      HWANGSAE_CALLER_DIRECTION_SRC, addr, username, resource);
+  return -1;
+}
+
+static void
+hwangsae_relay_accept_source (HwangsaeRelay * self)
+{
+  g_autoptr (GSocketAddress) addr = NULL;
+  g_autofree gchar *username = NULL;
+  g_autofree gchar *resource = NULL;
+  SinkConnection *sink;
+  SRTSOCKET sock;
+  guint sigid = SIG_CALLER_ACCEPTED;
+
+  sock = _srt_accept (self->source_listen_sock, &addr, &username, &resource);
+  if (sock == SRT_INVALID_SOCK) {
+    return;
+  }
+
+  if (self->authentication) {
+    sink = g_hash_table_lookup (self->username_sink_map, resource);
+
+    if (!sink && self->master_address) {
       /* In slave mode, open sink connection to the master relay. */
       SRTSOCKET master_sock;
-
-      g_assert (self->master_address);
 
       master_sock = hwangsae_relay_open_master_sock (self, resource);
       if (master_sock == SRT_INVALID_SOCK) {
@@ -665,30 +733,45 @@ hwangsae_relay_accept_source (HwangsaeRelay * self, SRTSOCKET sock,
 
       sink = g_new0 (SinkConnection, 1);
       sink->socket = master_sock;
-      sink->username = g_steal_pointer (&resource_autofree);
+      sink->username = g_steal_pointer (&resource);
 
       g_hash_table_insert (self->srtsocket_sink_map, &sink->socket, sink);
       g_hash_table_insert (self->username_sink_map, sink->username, sink);
 
       srt_epoll_add_usock (self->poll_id, sink->socket, &SRT_POLL_EVENTS);
     }
+  } else if (g_hash_table_size (self->srtsocket_sink_map) != 0) {
+    /* In unauthenticated mode pick the first (and likely only) sink. When
+     * the relay doesn't have any connected sink, the source gets rejected. */
+    GHashTableIter it;
+
+    g_hash_table_iter_init (&it, self->srtsocket_sink_map);
+    g_hash_table_iter_next (&it, NULL, (gpointer *) & sink);
+  }
+
+  if (!sink) {
+    goto reject;
+  }
+
+  {
+    g_autofree gchar *ip =
+        g_inet_address_to_string (g_inet_socket_address_get_address
+        (G_INET_SOCKET_ADDRESS (addr)));
 
     g_debug ("Accepting source %d from %s", sock, ip);
-
-    sink->sources = g_slist_append (sink->sources, GINT_TO_POINTER (sock));
   }
+
+  sink->sources = g_slist_append (sink->sources, GINT_TO_POINTER (sock));
 
   goto accept;
 
 reject:
-  result = -1;
+  srt_close (sock);
+  sigid = SIG_CALLER_REJECTED;
 
 accept:
-  g_signal_emit (self,
-      signals[(result == 0) ? SIG_CALLER_ACCEPTED : SIG_CALLER_REJECTED],
-      0, HWANGSAE_CALLER_DIRECTION_SRC, addr, username, resource);
-
-  return result;
+  g_signal_emit (self, signals[sigid], 0, HWANGSAE_CALLER_DIRECTION_SRC, addr,
+      username, resource);
 }
 
 static void
@@ -736,7 +819,7 @@ _relay_main (gpointer data)
   } else {
     self->sink_listen_sock = _srt_open_listen_sock (self->sink_port);
     srt_listen_callback (self->sink_listen_sock,
-        (srt_listen_callback_fn *) hwangsae_relay_accept_sink, self);
+        (srt_listen_callback_fn *) hwangsae_relay_authenticate_sink, self);
     srt_epoll_add_usock (self->poll_id, self->sink_listen_sock,
         &SRT_POLL_EVENTS);
 
@@ -751,7 +834,7 @@ _relay_main (gpointer data)
 
   self->source_listen_sock = _srt_open_listen_sock (self->source_port);
   srt_listen_callback (self->source_listen_sock,
-      (srt_listen_callback_fn *) hwangsae_relay_accept_source, self);
+      (srt_listen_callback_fn *) hwangsae_relay_authenticate_source, self);
   srt_epoll_add_usock (self->poll_id, self->source_listen_sock,
       &SRT_POLL_EVENTS);
 
@@ -775,12 +858,10 @@ _relay_main (gpointer data)
 
         LOCK_RELAY;
 
-        if (rsocket == self->sink_listen_sock ||
-            rsocket == self->source_listen_sock) {
-          /* We already added the socket to our internal structures in the
-           * accept callback, so only finalize its creation with srt_accept
-           * here */
-          srt_accept (rsocket, NULL, NULL);
+        if (rsocket == self->sink_listen_sock) {
+          hwangsae_relay_accept_sink (self);
+        } else if (rsocket == self->source_listen_sock) {
+          hwangsae_relay_accept_source (self);
         } else {
           gint recv;
           SinkConnection *sink;
