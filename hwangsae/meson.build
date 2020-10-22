@@ -51,7 +51,13 @@ libhwangsae = library(
   version: libversion,
   soversion: soversion,
   include_directories: hwangsae_incs,
-  dependencies: [ gstreamer_dep, gio_dep, libsrt_dep,libhwangsae_dbus_dep ],
+  dependencies: [
+    gstreamer_dep,
+    gio_dep,
+    libsrt_dep,
+    libhwangsae_dbus_dep,
+    gaeguli_dep
+  ],
   c_args: hwangsae_c_args,
   link_args: common_ldflags,
   install: true

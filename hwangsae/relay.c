@@ -21,6 +21,8 @@
 #include "common.h"
 #include "enumtypes.h"
 
+#include <gaeguli/gaeguli.h>
+
 #include <netinet/in.h>
 #include <srt/srt.h>
 #include <gio/gio.h>
@@ -120,6 +122,7 @@ enum
   SIG_IO_ERROR,
   SIG_AUTHENTICATE,
   SIG_ON_PASSPHRASE_ASKED,
+  SIG_ON_PBKEYLEN_ASKED,
   LAST_SIGNAL
 };
 
@@ -464,6 +467,12 @@ hwangsae_relay_class_init (HwangsaeRelayClass * klass)
       G_SIGNAL_RUN_LAST, 0, g_signal_accumulator_first_wins, NULL, NULL,
       G_TYPE_STRING, 4, HWANGSAE_TYPE_CALLER_DIRECTION, G_TYPE_SOCKET_ADDRESS,
       G_TYPE_STRING, G_TYPE_STRING);
+
+  signals[SIG_ON_PBKEYLEN_ASKED] =
+      g_signal_new ("on-pbkeylen-asked", G_TYPE_FROM_CLASS (klass),
+      G_SIGNAL_RUN_LAST, 0, g_signal_accumulator_first_wins, NULL, NULL,
+      GAEGULI_TYPE_SRT_KEY_LENGTH, 4, HWANGSAE_TYPE_CALLER_DIRECTION,
+      G_TYPE_SOCKET_ADDRESS, G_TYPE_STRING, G_TYPE_STRING);
 }
 
 const gchar STREAM_ID_PREFIX[] = "#!::";
@@ -539,6 +548,7 @@ hwangsae_relay_set_socket_encryption (HwangsaeRelay * self, SRTSOCKET sock,
     const gchar * username, const gchar * resource)
 {
   g_autofree gchar *passphrase = NULL;
+  GaeguliSRTKeyLength key_length = GAEGULI_SRT_KEY_LENGTH_0;
 
   g_signal_emit (self, signals[SIG_ON_PASSPHRASE_ASKED], 0, direction, addr,
       username, resource, &passphrase);
@@ -546,6 +556,14 @@ hwangsae_relay_set_socket_encryption (HwangsaeRelay * self, SRTSOCKET sock,
   if (passphrase && srt_setsockflag (sock, SRTO_PASSPHRASE, passphrase,
           strlen (passphrase))) {
     g_warning ("Failed to set passphrase: %s", srt_getlasterror_str ());
+    return FALSE;
+  }
+
+  g_signal_emit (self, signals[SIG_ON_PBKEYLEN_ASKED], 0, direction, addr,
+      username, resource, &key_length);
+
+  if (srt_setsockflag (sock, SRTO_PBKEYLEN, &key_length, sizeof (key_length))) {
+    g_warning ("Failed to set pbkeylen: %s", srt_getlasterror_str ());
     return FALSE;
   }
 
