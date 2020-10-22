@@ -745,7 +745,7 @@ hwangsae_relay_authenticate_source (HwangsaeRelay * self, SRTSOCKET sock,
   }
 
   if (!hwangsae_relay_set_socket_encryption (self, sock,
-          HWANGSAE_CALLER_DIRECTION_SINK, addr, username, resource)) {
+          HWANGSAE_CALLER_DIRECTION_SRC, addr, username, resource)) {
     goto reject;
   }
 
