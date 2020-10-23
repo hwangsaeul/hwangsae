@@ -39,23 +39,35 @@ typedef struct
   GSList *sources;
 } SinkConnection;
 
+typedef struct
+{
+  SRTSOCKET socket;
+  gchar *username;
+} SourceConnection;
+
 static gchar *_make_stream_id (const gchar * username, const gchar * resource);
 
 static void
-_sink_connection_remove_source (SinkConnection * sink, SRTSOCKET source)
+_source_connection_free (SourceConnection * source)
 {
-  g_debug ("Closing source connection %d", source);
-  srt_close (source);
-  sink->sources = g_slist_remove (sink->sources, GINT_TO_POINTER (source));
+  g_debug ("Closing source connection %d", source->socket);
+  srt_close (source->socket);
+  g_clear_pointer (&source->username, g_free);
+  g_free (source);
+}
+
+static void
+_sink_connection_remove_source (SinkConnection * sink,
+    SourceConnection * source)
+{
+  sink->sources = g_slist_remove (sink->sources, source);
+  _source_connection_free (source);
 }
 
 static void
 _sink_connection_free (SinkConnection * sink)
 {
-  while (sink->sources) {
-    _sink_connection_remove_source (sink,
-        GPOINTER_TO_INT (sink->sources->data));
-  }
+  g_clear_slist (&sink->sources, (GDestroyNotify) _source_connection_free);
 
   g_debug ("Closing sink connection %d", sink->socket);
   srt_close (sink->socket);
@@ -764,6 +776,7 @@ hwangsae_relay_accept_source (HwangsaeRelay * self)
   g_autofree gchar *username = NULL;
   g_autofree gchar *resource = NULL;
   SinkConnection *sink;
+  SourceConnection *source;
   SRTSOCKET sock;
   guint sigid = SIG_CALLER_ACCEPTED;
 
@@ -815,7 +828,11 @@ hwangsae_relay_accept_source (HwangsaeRelay * self)
     g_debug ("Accepting source %d from %s", sock, ip);
   }
 
-  sink->sources = g_slist_append (sink->sources, GINT_TO_POINTER (sock));
+  source = g_new0 (SourceConnection, 1);
+  source->socket = sock;
+  source->username = g_strdup (username);
+
+  sink->sources = g_slist_append (sink->sources, source);
 
   goto accept;
 
@@ -930,20 +947,20 @@ _relay_main (gpointer data)
               GSList *it = sink->sources;
 
               while (it) {
-                SRTSOCKET source_socket = GPOINTER_TO_INT (it->data);
+                SourceConnection *source = it->data;
 
                 it = it->next;
 
-                if (srt_getsockstate (source_socket) > SRTS_CONNECTED) {
-                  _sink_connection_remove_source (sink, source_socket);
+                if (srt_getsockstate (source->socket) > SRTS_CONNECTED) {
+                  _sink_connection_remove_source (sink, source);
                   continue;
                 }
 
-                if (srt_send (source_socket, buf, recv) < 0) {
-                  hwangsae_relay_emit_io_error_locked (self, source_socket,
+                if (srt_send (source->socket, buf, recv) < 0) {
+                  hwangsae_relay_emit_io_error_locked (self, source->socket,
                       HWANGSAE_RELAY_ERROR_WRITE, "srt_send failed: %s",
                       srt_strerror (srt_getlasterror (NULL), 0));
-                  _sink_connection_remove_source (sink, source_socket);
+                  _sink_connection_remove_source (sink, source);
                 }
               }
             } else if (recv < 0) {
