@@ -86,7 +86,31 @@ const gchar            *hwangsae_relay_get_sink_uri     (HwangsaeRelay *relay);
  *
  * Returns: the source URI
  */
- const gchar            *hwangsae_relay_get_source_uri   (HwangsaeRelay *relay);
+const gchar            *hwangsae_relay_get_source_uri   (HwangsaeRelay *relay);
+
+/**
+ * hwangsae_relay_disconnect_sink:
+ * @relay: a HwangsaeRelay object
+ * @username: SRT Stream ID username of the sink to disconnect
+ *
+ * Disconnects any sink that matches @username from @relay.
+ */
+void                    hwangsae_relay_disconnect_sink  (HwangsaeRelay *relay,
+                                                         const gchar   *username);
+
+/**
+ * hwangsae_relay_disconnect_source:
+ * @relay: a HwangsaeRelay object
+ * @username: SRT Stream ID username of the sources to disconnect
+ * @resource: SRT Stream ID username of the sources to disconnect
+ *
+ * Disconnects sources that match @username from @relay. If @resource is not
+ * NULL, only those @username sources that are connected to @resource get
+ * disconnected.
+ */
+void                    hwangsae_relay_disconnect_source(HwangsaeRelay *relay,
+                                                         const gchar   *username,
+                                                         const gchar   *resource);
 
 G_END_DECLS
 

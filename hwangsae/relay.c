@@ -1073,3 +1073,44 @@ hwangsae_relay_set_latency (HwangsaeRelay * self,
     g_warning ("Invalid direction is requested.");
   }
 }
+
+void
+hwangsae_relay_disconnect_sink (HwangsaeRelay * self, const gchar * username)
+{
+  SinkConnection *sink;
+
+  sink = g_hash_table_lookup (self->username_sink_map, username);
+  if (sink) {
+    hwangsae_relay_remove_sink (self, sink);
+  }
+}
+
+void
+hwangsae_relay_disconnect_source (HwangsaeRelay * self, const gchar * username,
+    const gchar * resource)
+{
+  GHashTableIter it;
+  SinkConnection *sink;
+
+  g_hash_table_iter_init (&it, self->username_sink_map);
+
+  while (g_hash_table_iter_next (&it, NULL, (gpointer *) & sink)) {
+    GSList *list;
+
+    if (resource && !g_str_equal (sink->username, resource)) {
+      continue;
+    }
+
+    list = sink->sources;
+    while (list) {
+      GSList *next = g_slist_next (list);
+      SourceConnection *source = list->data;
+
+      if (g_str_equal (source->username, username)) {
+        _sink_connection_remove_source (sink, source);
+      }
+
+      list = next;
+    }
+  }
+}
