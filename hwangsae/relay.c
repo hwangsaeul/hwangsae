@@ -165,7 +165,7 @@ hwangsae_relay_remove_sink (HwangsaeRelay * self, SinkConnection * sink)
 }
 
 static void
-hwangsae_relay_finalize (GObject * object)
+hwangsae_relay_dispose (GObject * object)
 {
   HwangsaeRelay *self = HWANGSAE_RELAY (object);
 
@@ -177,8 +177,8 @@ hwangsae_relay_finalize (GObject * object)
   g_clear_pointer (&self->sink_uri, g_free);
   g_clear_pointer (&self->source_uri, g_free);
 
-  srt_close (self->sink_listen_sock);
-  srt_close (self->source_listen_sock);
+  g_clear_handle_id (&self->sink_listen_sock, srt_close);
+  g_clear_handle_id (&self->source_listen_sock, srt_close);
 
   g_clear_object (&self->master_address);
   g_clear_pointer (&self->master_username, g_free);
@@ -417,7 +417,7 @@ hwangsae_relay_class_init (HwangsaeRelayClass * klass)
 
   gobject_class->set_property = hwangsae_relay_set_property;
   gobject_class->get_property = hwangsae_relay_get_property;
-  gobject_class->finalize = hwangsae_relay_finalize;
+  gobject_class->dispose = hwangsae_relay_dispose;
 
   g_object_class_install_property (gobject_class, PROP_SINK_PORT,
       g_param_spec_uint ("sink-port", "SRT Binding port (from) ",
@@ -1084,6 +1084,8 @@ hwangsae_relay_disconnect_sink (HwangsaeRelay * self, const gchar * username)
 {
   SinkConnection *sink;
 
+  LOCK_RELAY;
+
   sink = g_hash_table_lookup (self->username_sink_map, username);
   if (sink) {
     hwangsae_relay_remove_sink (self, sink);
@@ -1096,6 +1098,8 @@ hwangsae_relay_disconnect_source (HwangsaeRelay * self, const gchar * username,
 {
   GHashTableIter it;
   SinkConnection *sink;
+
+  LOCK_RELAY;
 
   g_hash_table_iter_init (&it, self->username_sink_map);
 
