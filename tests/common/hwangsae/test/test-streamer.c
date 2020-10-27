@@ -20,22 +20,7 @@
 
 #include "test-streamer.h"
 
-#include <gaeguli/gaeguli.h>
 #include <gst/gsturi.h>
-
-struct _HwangsaeTestStreamer
-{
-  GObject parent;
-
-  gchar *uri;
-  gchar *username;
-  GaeguliVideoResolution resolution;
-
-  GaeguliPipeline *pipeline;
-
-  gboolean should_stream;
-  GThread *streaming_thread;
-};
 
 /* *INDENT-OFF* */
 G_DEFINE_TYPE (HwangsaeTestStreamer, hwangsae_test_streamer, G_TYPE_OBJECT)
