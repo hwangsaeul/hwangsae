@@ -1,3 +1,5 @@
+![Build Status](https://github.com/hwangsaeul/hwangsae/workflows/CI/badge.svg?branch=master)
+
 # Hwangsae
 
 **Hwangsae** means *stork* and acts mainly as the SRT relay to provide the lowest latency to end-user.
