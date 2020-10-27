@@ -916,14 +916,16 @@ _relay_main (gpointer data)
 
   while (self->run_relay_thread) {
     gint rnum = G_N_ELEMENTS (readfds);
+    gint num_ready_sockets;
 
-    if (srt_epoll_wait (self->poll_id, readfds, &rnum, 0, 0,
-            MAX_EPOLL_WAIT_TIMEOUT_MS, NULL, 0, NULL, 0) > 0) {
+    num_ready_sockets = srt_epoll_wait (self->poll_id, readfds, &rnum, 0, 0,
+        MAX_EPOLL_WAIT_TIMEOUT_MS, NULL, 0, NULL, 0);
 
-      if (!self->run_relay_thread) {
-        break;
-      }
+    if (!self->run_relay_thread) {
+      break;
+    }
 
+    if (num_ready_sockets > 0) {
       while (rnum != 0) {
         SRTSOCKET rsocket = readfds[--rnum];
 
