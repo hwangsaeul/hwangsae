@@ -66,7 +66,7 @@ common_ldflags = [ ]
 
 subdir('hwangsae')
 #subdir('agent')
-subdir('tools')
+#subdir('tools')
 subdir('tests')
 subdir('doc')
 
