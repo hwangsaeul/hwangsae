@@ -13,5 +13,5 @@ Experimental versions of Hwangsae are daily generated in [launchpad](https://lau
 ```console
 $ sudo add-apt-repository ppa:hwangsaeul/nightly
 $ sudo apt-get update
-$ sudo apt-get install hwangsae-tools libhwangsae-dev libhwangsae2
+$ sudo apt-get install libhwangsae-dev libhwangsae2
 ```
