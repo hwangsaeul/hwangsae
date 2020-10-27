@@ -938,7 +938,10 @@ _relay_main (gpointer data)
           SinkConnection *sink;
 
           sink = g_hash_table_lookup (self->srtsocket_sink_map, &rsocket);
-          g_assert (sink != NULL);
+          if (sink == NULL) {
+            /* Sink has got removed meanwhile. */
+            continue;
+          }
 
           do {
             recv = srt_recv (rsocket, buf, sizeof (buf));
