@@ -23,10 +23,26 @@
 
 #include <glib-object.h>
 
+#include <gaeguli/gaeguli.h>
+
 G_BEGIN_DECLS
 
 #define HWANGSAE_TYPE_TEST_STREAMER     (hwangsae_test_streamer_get_type ())
 G_DECLARE_FINAL_TYPE                    (HwangsaeTestStreamer, hwangsae_test_streamer, HWANGSAE, TEST_STREAMER, GObject)
+
+struct _HwangsaeTestStreamer
+{
+  GObject parent;
+
+  gchar *uri;
+  gchar *username;
+  GaeguliVideoResolution resolution;
+
+  GaeguliPipeline *pipeline;
+
+  gboolean should_stream;
+  GThread *streaming_thread;
+};
 
 HwangsaeTestStreamer * hwangsae_test_streamer_new     (void);
 void                   hwangsae_test_streamer_set_uri (HwangsaeTestStreamer * self,
