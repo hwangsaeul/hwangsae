@@ -36,6 +36,7 @@ typedef struct
 {
   SRTSOCKET socket;
   gchar *username;
+  HwangsaeRelay *relay;
   GSList *sources;
 } SinkConnection;
 
@@ -43,6 +44,7 @@ typedef struct
 {
   SRTSOCKET socket;
   gchar *username;
+  HwangsaeRelay *relay;
 } SourceConnection;
 
 static gchar *_make_stream_id (const gchar * username, const gchar * resource);
@@ -51,6 +53,7 @@ static void
 _source_connection_free (SourceConnection * source)
 {
   g_debug ("Closing source connection %d", source->socket);
+  g_signal_emit_by_name (source->relay, "caller-closed", source->socket);
   srt_close (source->socket);
   g_clear_pointer (&source->username, g_free);
   g_free (source);
@@ -70,6 +73,7 @@ _sink_connection_free (SinkConnection * sink)
   g_clear_slist (&sink->sources, (GDestroyNotify) _source_connection_free);
 
   g_debug ("Closing sink connection %d", sink->socket);
+  g_signal_emit_by_name (sink->relay, "caller-closed", sink->socket);
   srt_close (sink->socket);
   g_clear_pointer (&sink->username, g_free);
   g_free (sink);
@@ -131,6 +135,7 @@ enum
 {
   SIG_CALLER_ACCEPTED,
   SIG_CALLER_REJECTED,
+  SIG_CALLER_CLOSED,
   SIG_IO_ERROR,
   SIG_AUTHENTICATE,
   SIG_ON_PASSPHRASE_ASKED,
@@ -462,6 +467,10 @@ hwangsae_relay_class_init (HwangsaeRelayClass * klass)
       G_TYPE_INT, HWANGSAE_TYPE_CALLER_DIRECTION, G_TYPE_SOCKET_ADDRESS,
       G_TYPE_STRING, G_TYPE_STRING);
 
+  signals[SIG_CALLER_CLOSED] =
+      g_signal_new ("caller-closed", G_TYPE_FROM_CLASS (klass),
+      G_SIGNAL_RUN_LAST, 0, NULL, NULL, NULL, G_TYPE_NONE, 1, G_TYPE_INT);
+
   signals[SIG_IO_ERROR] =
       g_signal_new ("io-error", G_TYPE_FROM_CLASS (klass),
       G_SIGNAL_RUN_LAST, 0, NULL, NULL, NULL, G_TYPE_NONE, 2,
@@ -682,6 +691,7 @@ hwangsae_relay_accept_sink (HwangsaeRelay * self)
   sink = g_new0 (SinkConnection, 1);
   sink->socket = sock;
   sink->username = g_steal_pointer (&username);
+  sink->relay = self;
 
   {
     g_autofree gchar *ip =
@@ -802,6 +812,7 @@ hwangsae_relay_accept_source (HwangsaeRelay * self)
       sink = g_new0 (SinkConnection, 1);
       sink->socket = master_sock;
       sink->username = g_steal_pointer (&resource);
+      sink->relay = self;
 
       g_hash_table_insert (self->srtsocket_sink_map, &sink->socket, sink);
       g_hash_table_insert (self->username_sink_map, sink->username, sink);
@@ -832,6 +843,7 @@ hwangsae_relay_accept_source (HwangsaeRelay * self)
   source = g_new0 (SourceConnection, 1);
   source->socket = sock;
   source->username = g_strdup (username);
+  source->relay = self;
 
   sink->sources = g_slist_append (sink->sources, source);
 
