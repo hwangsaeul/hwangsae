@@ -452,15 +452,15 @@ hwangsae_relay_class_init (HwangsaeRelayClass * klass)
 
   signals[SIG_CALLER_ACCEPTED] =
       g_signal_new ("caller-accepted", G_TYPE_FROM_CLASS (klass),
-      G_SIGNAL_RUN_LAST, 0, NULL, NULL, NULL, G_TYPE_NONE, 4,
-      HWANGSAE_TYPE_CALLER_DIRECTION, G_TYPE_SOCKET_ADDRESS, G_TYPE_STRING,
-      G_TYPE_STRING);
+      G_SIGNAL_RUN_LAST, 0, NULL, NULL, NULL, G_TYPE_NONE, 5,
+      G_TYPE_INT, HWANGSAE_TYPE_CALLER_DIRECTION, G_TYPE_SOCKET_ADDRESS,
+      G_TYPE_STRING, G_TYPE_STRING);
 
   signals[SIG_CALLER_REJECTED] =
       g_signal_new ("caller-rejected", G_TYPE_FROM_CLASS (klass),
       G_SIGNAL_RUN_LAST, 0, NULL, NULL, NULL, G_TYPE_NONE, 4,
-      HWANGSAE_TYPE_CALLER_DIRECTION, G_TYPE_SOCKET_ADDRESS, G_TYPE_STRING,
-      G_TYPE_STRING);
+      G_TYPE_INT, HWANGSAE_TYPE_CALLER_DIRECTION, G_TYPE_SOCKET_ADDRESS,
+      G_TYPE_STRING, G_TYPE_STRING);
 
   signals[SIG_IO_ERROR] =
       g_signal_new ("io-error", G_TYPE_FROM_CLASS (klass),
@@ -629,7 +629,7 @@ hwangsae_relay_authenticate_sink (HwangsaeRelay * self, SRTSOCKET sock,
   return 0;
 
 reject:
-  g_signal_emit (self, signals[SIG_CALLER_REJECTED], 0,
+  g_signal_emit (self, signals[SIG_CALLER_REJECTED], 0, sock,
       HWANGSAE_CALLER_DIRECTION_SINK, addr, username, resource);
 
   return -1;
@@ -700,7 +700,8 @@ hwangsae_relay_accept_sink (HwangsaeRelay * self)
   srt_epoll_add_usock (self->poll_id, sock, &SRT_POLL_EVENTS);
 
   g_signal_emit (self, signals[SIG_CALLER_ACCEPTED],
-      0, HWANGSAE_CALLER_DIRECTION_SINK, addr, sink->username, resource);
+      0, sink->socket, HWANGSAE_CALLER_DIRECTION_SINK, addr, sink->username,
+      resource);
 }
 
 static gint
@@ -764,7 +765,7 @@ hwangsae_relay_authenticate_source (HwangsaeRelay * self, SRTSOCKET sock,
   return 0;
 
 reject:
-  g_signal_emit (self, signals[SIG_CALLER_REJECTED], 0,
+  g_signal_emit (self, signals[SIG_CALLER_REJECTED], 0, sock,
       HWANGSAE_CALLER_DIRECTION_SRC, addr, username, resource);
   return -1;
 }
@@ -841,8 +842,8 @@ reject:
   sigid = SIG_CALLER_REJECTED;
 
 accept:
-  g_signal_emit (self, signals[sigid], 0, HWANGSAE_CALLER_DIRECTION_SRC, addr,
-      username, resource);
+  g_signal_emit (self, signals[sigid], 0, source->socket,
+      HWANGSAE_CALLER_DIRECTION_SRC, addr, username, resource);
 }
 
 static void
