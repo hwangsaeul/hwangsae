@@ -324,8 +324,9 @@ _authenticate (HwangsaeRelay * relay, HwangsaeCallerDirection direction,
 }
 
 static void
-_caller_accepted (HwangsaeRelay * relay, HwangsaeCallerDirection direction,
-    GSocketAddress * addr, const gchar * username, const gchar * resource,
+_caller_accepted (HwangsaeRelay * relay, gint id,
+    HwangsaeCallerDirection direction, GSocketAddress * addr,
+    const gchar * username, const gchar * resource,
     AuthenticationTestData * data)
 {
   switch (direction) {
@@ -411,7 +412,7 @@ test_authentication (void)
 }
 
 static void
-_flip_flag (HwangsaeRelay * relay, HwangsaeCallerDirection direction,
+_flip_flag (HwangsaeRelay * relay, gint id, HwangsaeCallerDirection direction,
     GInetSocketAddress * addr, const gchar * username, const gchar * resource,
     gpointer data)
 {
@@ -490,9 +491,9 @@ typedef struct
 } SlaveTestData;
 
 static void
-_slave_accepted (HwangsaeRelay * relay, HwangsaeCallerDirection direction,
-    GInetSocketAddress * addr, const gchar * username, const gchar * resource,
-    SlaveTestData * data)
+_slave_accepted (HwangsaeRelay * relay, gint id,
+    HwangsaeCallerDirection direction, GInetSocketAddress * addr,
+    const gchar * username, const gchar * resource, SlaveTestData * data)
 {
   if (direction == HWANGSAE_CALLER_DIRECTION_SRC) {
     g_debug ("Slave accepted");
