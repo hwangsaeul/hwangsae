@@ -298,7 +298,7 @@ _make_socket_nonblocking (SRTSOCKET sock)
 }
 
 static SRTSOCKET
-_srt_open_listen_sock (guint port)
+_srt_open_listen_sock (guint port, gint latency)
 {
   g_autoptr (GSocketAddress) sockaddr = NULL;
   g_autoptr (GError) error = NULL;
@@ -320,6 +320,11 @@ _srt_open_listen_sock (guint port)
   }
 
   listen_sock = srt_socket (AF_INET, SOCK_DGRAM, 0);
+
+  if (srt_setsockflag (listen_sock, SRTO_LATENCY, &latency, sizeof (gint))) {
+    g_error ("Failed to set SRT Latency: %s", srt_getlasterror_str ());
+  }
+
   _apply_socket_options (listen_sock);
   _make_socket_nonblocking (listen_sock);
 
@@ -900,31 +905,23 @@ _relay_main (gpointer data)
     g_debug ("Acting as a slave to the master relay at %s:%u", addr_s,
         g_inet_socket_address_get_port (self->master_address));
   } else {
-    self->sink_listen_sock = _srt_open_listen_sock (self->sink_port);
+    self->sink_listen_sock =
+        _srt_open_listen_sock (self->sink_port, self->sink_latency);
     srt_listen_callback (self->sink_listen_sock,
         (srt_listen_callback_fn *) hwangsae_relay_authenticate_sink, self);
     srt_epoll_add_usock (self->poll_id, self->sink_listen_sock,
         &SRT_POLL_EVENTS);
 
-    if (srt_setsockflag (self->sink_listen_sock, SRTO_LATENCY,
-            &self->sink_latency, sizeof (gint))) {
-      g_error ("%s", srt_getlasterror_str ());
-    }
-
     g_debug ("URI for sink connection is %s",
         hwangsae_relay_get_sink_uri (self));
   }
 
-  self->source_listen_sock = _srt_open_listen_sock (self->source_port);
+  self->source_listen_sock =
+      _srt_open_listen_sock (self->source_port, self->src_latency);
   srt_listen_callback (self->source_listen_sock,
       (srt_listen_callback_fn *) hwangsae_relay_authenticate_source, self);
   srt_epoll_add_usock (self->poll_id, self->source_listen_sock,
       &SRT_POLL_EVENTS);
-
-  if (srt_setsockflag (self->source_listen_sock, SRTO_LATENCY,
-          &self->src_latency, sizeof (gint))) {
-    g_error ("%s", srt_getlasterror_str ());
-  }
 
   while (self->run_relay_thread) {
     gint rnum = G_N_ELEMENTS (readfds);
