@@ -153,7 +153,6 @@ typedef struct
 } SrtParam;
 
 static SrtParam srt_params[] = {
-  {"SRTO_LINGER", SRTO_LINGER, 0},
   {"SRTO_TSBPMODE", SRTO_TSBPDMODE, 1}, /* Timestamp-based Packet Delivery */
   {"SRTO_RENDEZVOUS", SRTO_RENDEZVOUS, 0},      /* 0: not for rendezvous */
   {"SRTO_SNDBUFLEN", SRTO_SNDBUF, 2 * 0xb80000},
