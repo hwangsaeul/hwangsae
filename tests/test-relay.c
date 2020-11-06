@@ -205,9 +205,9 @@ test_m_to_n (void)
 }
 
 static void
-_on_sink_rejected (HwangsaeRelay * relay, HwangsaeCallerDirection direction,
-    GInetSocketAddress * addr, const gchar * username, const gchar * resource,
-    gpointer data)
+_on_sink_rejected (HwangsaeRelay * relay, gint id,
+    HwangsaeCallerDirection direction, GInetSocketAddress * addr,
+    const gchar * username, const gchar * resource, gpointer data)
 {
   GInetAddress *ip = NULL;
   g_autofree gchar *ip_str = NULL;
@@ -249,9 +249,9 @@ test_reject_sink (void)
 }
 
 static void
-_on_source_rejected (HwangsaeRelay * relay, HwangsaeCallerDirection direction,
-    GInetSocketAddress * addr, const gchar * username, const gchar * resource,
-    gpointer data)
+_on_source_rejected (HwangsaeRelay * relay, int id,
+    HwangsaeCallerDirection direction, GInetSocketAddress * addr,
+    const gchar * username, const gchar * resource, gpointer data)
 {
   GInetAddress *ip = NULL;
   g_autofree gchar *ip_str = NULL;
@@ -342,8 +342,9 @@ _caller_accepted (HwangsaeRelay * relay, gint id,
 }
 
 static void
-_caller_rejected (HwangsaeRelay * relay, HwangsaeCallerDirection direction,
-    GSocketAddress * addr, const gchar * username, const gchar * resource,
+_caller_rejected (HwangsaeRelay * relay, gint id,
+    HwangsaeCallerDirection direction, GSocketAddress * addr,
+    const gchar * username, const gchar * resource,
     AuthenticationTestData * data)
 {
   switch (direction) {
@@ -506,9 +507,9 @@ _slave_accepted (HwangsaeRelay * relay, gint id,
 }
 
 static void
-_slave_rejected (HwangsaeRelay * relay, HwangsaeCallerDirection direction,
-    GInetSocketAddress * addr, const gchar * username, const gchar * resource,
-    SlaveTestData * data)
+_slave_rejected (HwangsaeRelay * relay, gint id,
+    HwangsaeCallerDirection direction, GInetSocketAddress * addr,
+    const gchar * username, const gchar * resource, SlaveTestData * data)
 {
   if (direction == HWANGSAE_CALLER_DIRECTION_SRC) {
     g_debug ("Slave rejected");
@@ -521,9 +522,9 @@ _slave_rejected (HwangsaeRelay * relay, HwangsaeCallerDirection direction,
 }
 
 static void
-_receiver_rejected (HwangsaeRelay * relay, HwangsaeCallerDirection direction,
-    GInetSocketAddress * addr, const gchar * username, const gchar * resource,
-    SlaveTestData * data)
+_receiver_rejected (HwangsaeRelay * relay, gint id,
+    HwangsaeCallerDirection direction, GInetSocketAddress * addr,
+    const gchar * username, const gchar * resource, SlaveTestData * data)
 {
   if (direction == HWANGSAE_CALLER_DIRECTION_SRC) {
     g_debug ("Receiver rejected");
