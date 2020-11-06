@@ -520,7 +520,11 @@ _parse_stream_id (const gchar * stream_id)
     keyval = g_strsplit (*it, "=", 2);
 
     if (keyval && keyval[0] && keyval[1]) {
-      g_variant_dict_insert (dict, keyval[0], "s", keyval[1]);
+      if (g_str_equal (keyval[0], "h8l_bufsize")) {
+        g_variant_dict_insert (dict, keyval[0], "i", atoi (keyval[1]));
+      } else {
+        g_variant_dict_insert (dict, keyval[0], "s", keyval[1]);
+      }
     }
 
     g_strfreev (keyval);
@@ -586,6 +590,25 @@ hwangsae_relay_set_socket_encryption (HwangsaeRelay * self, SRTSOCKET sock,
   return TRUE;
 }
 
+static void
+_apply_bufsize_suggestion (SRTSOCKET sock, HwangsaeCallerDirection direction,
+    GVariantDict * parsed_id)
+{
+  if (parsed_id && g_variant_dict_contains (parsed_id, "h8l_bufsize")) {
+    gint32 buffer = 0;
+    SRT_SOCKOPT opt = (direction == HWANGSAE_CALLER_DIRECTION_SINK) ?
+        SRTO_RCVBUF : SRTO_SNDBUF;
+
+    g_variant_dict_lookup (parsed_id, "h8l_bufsize", "i", &buffer);
+
+    if (srt_setsockflag (sock, opt, &buffer, sizeof (buffer))) {
+      g_warning ("Couldn't set buffer size: %s", srt_getlasterror_str ());
+    } else {
+      g_debug ("Setting buffer for %d to %d B", sock, buffer);
+    }
+  }
+}
+
 static gint
 hwangsae_relay_authenticate_sink (HwangsaeRelay * self, SRTSOCKET sock,
     gint hs_version, const struct sockaddr *peeraddr, const gchar * stream_id)
@@ -638,6 +661,8 @@ hwangsae_relay_authenticate_sink (HwangsaeRelay * self, SRTSOCKET sock,
     reason = HWANGSAE_REJECT_REASON_ENCRYPTION;
     goto reject;
   }
+
+  _apply_bufsize_suggestion (sock, HWANGSAE_CALLER_DIRECTION_SINK, parsed_id);
 
   return 0;
 
@@ -786,6 +811,8 @@ hwangsae_relay_authenticate_source (HwangsaeRelay * self, SRTSOCKET sock,
     reason = HWANGSAE_REJECT_REASON_ENCRYPTION;
     goto reject;
   }
+
+  _apply_bufsize_suggestion (sock, HWANGSAE_CALLER_DIRECTION_SRC, parsed_id);
 
   return 0;
 
