@@ -467,7 +467,7 @@ hwangsae_relay_class_init (HwangsaeRelayClass * klass)
 
   signals[SIG_CALLER_REJECTED] =
       g_signal_new ("caller-rejected", G_TYPE_FROM_CLASS (klass),
-      G_SIGNAL_RUN_LAST, 0, NULL, NULL, NULL, G_TYPE_NONE, 4,
+      G_SIGNAL_RUN_LAST, 0, NULL, NULL, NULL, G_TYPE_NONE, 5,
       G_TYPE_INT, HWANGSAE_TYPE_CALLER_DIRECTION, G_TYPE_SOCKET_ADDRESS,
       G_TYPE_STRING, G_TYPE_STRING);
 
