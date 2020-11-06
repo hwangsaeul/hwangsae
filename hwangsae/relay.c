@@ -502,21 +502,15 @@ hwangsae_relay_class_init (HwangsaeRelayClass * klass)
 
 const gchar STREAM_ID_PREFIX[] = "#!::";
 
-static void
-_parse_stream_id (const gchar * stream_id, gchar ** username, gchar ** resource)
+static GVariantDict *
+_parse_stream_id (const gchar * stream_id)
 {
+  GVariantDict *dict = g_variant_dict_new (NULL);
   gchar **keys;
   gchar **it;
 
   if (!g_str_has_prefix (stream_id, STREAM_ID_PREFIX)) {
-    return;
-  }
-
-  if (username) {
-    *username = NULL;
-  }
-  if (resource) {
-    *resource = NULL;
+    goto out;
   }
 
   keys = g_strsplit (stream_id + sizeof (STREAM_ID_PREFIX) - 1, ",", -1);
@@ -526,19 +520,16 @@ _parse_stream_id (const gchar * stream_id, gchar ** username, gchar ** resource)
     keyval = g_strsplit (*it, "=", 2);
 
     if (keyval && keyval[0] && keyval[1]) {
-      if (g_str_equal (keyval[0], "u") && username) {
-        g_clear_pointer (username, g_free);
-        *username = g_strdup (keyval[1]);
-      } else if (g_str_equal (keyval[0], "r") && resource) {
-        g_clear_pointer (resource, g_free);
-        *resource = g_strdup (keyval[1]);
-      }
+      g_variant_dict_insert (dict, keyval[0], "s", keyval[1]);
     }
 
     g_strfreev (keyval);
   }
 
   g_strfreev (keys);
+
+out:
+  return dict;
 }
 
 static gchar *
@@ -600,9 +591,9 @@ hwangsae_relay_authenticate_sink (HwangsaeRelay * self, SRTSOCKET sock,
     gint hs_version, const struct sockaddr *peeraddr, const gchar * stream_id)
 {
   g_autoptr (GSocketAddress) addr = _peeraddr_to_g_socket_address (peeraddr);
-  g_autofree gchar *username_autofree = NULL;
-  gchar *username = NULL;
-  g_autofree gchar *resource = NULL;
+  g_autoptr (GVariantDict) parsed_id = NULL;
+  const gchar *username = NULL;
+  const gchar *resource = NULL;
   HwangsaeRejectReason reason;
 
   {
@@ -611,8 +602,9 @@ hwangsae_relay_authenticate_sink (HwangsaeRelay * self, SRTSOCKET sock,
     LOCK_RELAY;
 
     if (self->authentication) {
-      _parse_stream_id (stream_id, &username, &resource);
-      username_autofree = username;
+      parsed_id = _parse_stream_id (stream_id);
+      g_variant_dict_lookup (parsed_id, "u", "&s", &username);
+      g_variant_dict_lookup (parsed_id, "r", "&s", &resource);
 
       /* Sink socket must have username in its Stream ID and not been already
        * registered. */
@@ -666,6 +658,7 @@ _srt_accept (SRTSOCKET listen_socket, GSocketAddress ** peeraddr,
     struct sockaddr sa;
   } peer_sa;
   int peer_sa_len = sizeof (peer_sa);
+  g_autoptr (GVariantDict) parsed_id = NULL;
   SRTSOCKET sock;
   gchar stream_id[512];
   gint optlen = sizeof (stream_id);
@@ -677,7 +670,9 @@ _srt_accept (SRTSOCKET listen_socket, GSocketAddress ** peeraddr,
     return SRT_INVALID_SOCK;
   }
 
-  _parse_stream_id (stream_id, username, resource);
+  parsed_id = _parse_stream_id (stream_id);
+  g_variant_dict_lookup (parsed_id, "u", "s", username);
+  g_variant_dict_lookup (parsed_id, "r", "s", resource);
 
   if (peeraddr) {
     *peeraddr = _peeraddr_to_g_socket_address (&peer_sa.sa);
@@ -731,8 +726,9 @@ hwangsae_relay_authenticate_source (HwangsaeRelay * self, SRTSOCKET sock,
     gint hs_version, const struct sockaddr *peeraddr, const gchar * stream_id)
 {
   g_autoptr (GSocketAddress) addr = _peeraddr_to_g_socket_address (peeraddr);
-  g_autofree gchar *username = NULL;
-  g_autofree gchar *resource = NULL;
+  g_autoptr (GVariantDict) parsed_id = NULL;
+  const gchar *username = NULL;
+  const gchar *resource = NULL;
   SinkConnection *sink = NULL;
   HwangsaeRejectReason reason;
   g_autofree gchar *ip =
@@ -745,7 +741,9 @@ hwangsae_relay_authenticate_source (HwangsaeRelay * self, SRTSOCKET sock,
     LOCK_RELAY;
 
     if (self->authentication) {
-      _parse_stream_id (stream_id, &username, &resource);
+      parsed_id = _parse_stream_id (stream_id);
+      g_variant_dict_lookup (parsed_id, "u", "&s", &username);
+      g_variant_dict_lookup (parsed_id, "r", "&s", &resource);
 
       if (!resource) {
         // Source socket must specify ID of the sink stream it wants to receive.
