@@ -319,7 +319,7 @@ _srt_open_listen_sock (guint port, gint latency)
     goto failed;
   }
 
-  listen_sock = srt_socket (AF_INET, SOCK_DGRAM, 0);
+  listen_sock = srt_create_socket ();
 
   if (srt_setsockflag (listen_sock, SRTO_LATENCY, &latency, sizeof (gint))) {
     g_error ("Failed to set SRT Latency: %s", srt_getlasterror_str ());
@@ -370,7 +370,7 @@ hwangsae_relay_open_master_sock (HwangsaeRelay * self, const gchar * resource)
     goto failed;
   }
 
-  master_sock = srt_socket (AF_INET, SOCK_DGRAM, 0);
+  master_sock = srt_create_socket ();
   _apply_socket_options (master_sock);
 
   streamid = _make_stream_id (self->master_username, resource);
