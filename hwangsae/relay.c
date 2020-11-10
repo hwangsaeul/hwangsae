@@ -1155,19 +1155,21 @@ struct
 };
 /* *INDENT-ON* */
 
+typedef union
+{
+  gint32 i32;
+  gint64 i64;
+  gboolean bool;
+  gchar str[OPT_STR_MAXLEN];
+  struct linger linger;
+  const gchar *str_ptr;
+} OptionValue;
+
 GVariant *
 hwangsae_relay_get_socket_option (HwangsaeRelay * relay, SRTSOCKET sock,
     gint option, GError ** error)
 {
-  union
-  {
-    gint32 i32;
-    gint64 i64;
-    gboolean bool;
-    gchar str[OPT_STR_MAXLEN];
-    struct linger linger;
-    void *val;
-  } val;
+  OptionValue val;
   const GVariantType *type = srt_options[option].type;
   gint optlen = srt_options[option].optlen;
   g_autoptr (GError) gerror = NULL;
@@ -1208,6 +1210,63 @@ error:
     gerror = NULL;
   }
   return NULL;
+}
+
+gboolean
+hwangsae_relay_set_socket_option (HwangsaeRelay * relay, SRTSOCKET sock,
+    gint option, GVariant * value, GError ** error)
+{
+  OptionValue val;
+  const GVariantType *type = srt_options[option].type;
+  gsize optlen = srt_options[option].optlen;
+  g_autoptr (GError) gerror = NULL;
+
+  if (option < 0 || option >= G_N_ELEMENTS (srt_options)) {
+    gerror = g_error_new (HWANGSAE_RELAY_ERROR,
+        HWANGSAE_RELAY_ERROR_UNKNOWN_SOCKOPT, "Unknown socket option %d",
+        option);
+    goto error;
+  }
+
+  if (!g_variant_type_equal (g_variant_get_type (value), type)) {
+    gerror = g_error_new (HWANGSAE_RELAY_ERROR,
+        HWANGSAE_RELAY_ERROR_INVALID_PARAMETER,
+        "Invalid type %s for socket option %d",
+        (const gchar *) g_variant_get_type (value), option);
+    goto error;
+  }
+
+  if (g_variant_type_equal (type, G_VARIANT_TYPE_INT32)) {
+    val.i32 = g_variant_get_int32 (value);
+  }
+  if (g_variant_type_equal (type, G_VARIANT_TYPE_INT64)) {
+    val.i64 = g_variant_get_int64 (value);
+  }
+  if (g_variant_type_equal (type, G_VARIANT_TYPE_BOOLEAN)) {
+    val.bool = g_variant_get_boolean (value);
+  }
+  if (g_variant_type_equal (type, G_VARIANT_TYPE_STRING)) {
+    val.str_ptr = g_variant_get_string (value, &optlen);
+  }
+  if (g_variant_type_equal (type, HWANGSAE_VARIANT_TYPE_LINGER)) {
+    g_variant_get (value, (const gchar *) HWANGSAE_VARIANT_TYPE_LINGER,
+        &val.linger.l_onoff, &val.linger.l_linger);
+  }
+
+  if (srt_setsockflag (sock, option, &val, optlen) == SRT_ERROR) {
+    gerror = g_error_new (HWANGSAE_RELAY_ERROR, HWANGSAE_RELAY_ERROR_SOCKOPT,
+        "Error setting socket option %d: %s", option, srt_getlasterror_str ());
+    goto error;
+  }
+
+  return TRUE;
+
+error:
+  if (error) {
+    g_propagate_error (error, gerror);
+    gerror = NULL;
+  }
+  return FALSE;
 }
 
 void
