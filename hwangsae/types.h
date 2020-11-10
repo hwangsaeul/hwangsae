@@ -49,6 +49,8 @@ GQuark hwangsae_relay_error_quark      (void);
 typedef enum {
   HWANGSAE_RELAY_ERROR_READ = 1,
   HWANGSAE_RELAY_ERROR_WRITE,
+  HWANGSAE_RELAY_ERROR_UNKNOWN_SOCKOPT,
+  HWANGSAE_RELAY_ERROR_SOCKOPT,
 } HwangsaeRelayError;
 
 #define HWANGSAE_TRANSMUXER_ERROR      (hwangsae_transmuxer_error_quark())
