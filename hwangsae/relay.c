@@ -1073,6 +1073,143 @@ hwangsae_relay_get_source_uri (HwangsaeRelay * self)
   return self->source_uri;
 }
 
+#define OPT_STR_MAXLEN 512
+
+#define HWANGSAE_VARIANT_TYPE_LINGER ((const GVariantType *) "(ii)")
+
+#define VARIANT_TYPE(vartype, optlen) { G_VARIANT_TYPE_##vartype, optlen }
+#define VARIANT_TYPE_INT32   VARIANT_TYPE(INT32, sizeof (gint32))
+#define VARIANT_TYPE_INT64   VARIANT_TYPE(INT64, sizeof (gint64))
+#define VARIANT_TYPE_BOOLEAN VARIANT_TYPE(BOOLEAN, sizeof (gboolean))
+#define VARIANT_TYPE_STRING  VARIANT_TYPE(STRING, OPT_STR_MAXLEN)
+
+/* *INDENT-OFF* */
+struct
+{
+  const GVariantType *type;
+  gint optlen;
+} srt_options[] = {
+  [SRTO_MSS]                = VARIANT_TYPE_INT32,
+  [SRTO_SNDSYN]             = VARIANT_TYPE_BOOLEAN,
+  [SRTO_RCVSYN]             = VARIANT_TYPE_BOOLEAN,
+  [SRTO_ISN]                = VARIANT_TYPE_INT32,
+  [SRTO_FC]                 = VARIANT_TYPE_INT32,
+  [SRTO_SNDBUF]             = VARIANT_TYPE_INT32,
+  [SRTO_RCVBUF]             = VARIANT_TYPE_INT32,
+  [SRTO_LINGER]             = {
+      HWANGSAE_VARIANT_TYPE_LINGER,
+      sizeof (struct linger)
+  },
+  [SRTO_UDP_SNDBUF]         = VARIANT_TYPE_INT32,
+  [SRTO_UDP_RCVBUF]         = VARIANT_TYPE_INT32,
+  [SRTO_RENDEZVOUS]         = VARIANT_TYPE_BOOLEAN,
+  [SRTO_SNDTIMEO]           = VARIANT_TYPE_INT32,
+  [SRTO_RCVTIMEO]           = VARIANT_TYPE_INT32,
+  [SRTO_REUSEADDR]          = VARIANT_TYPE_BOOLEAN,
+  [SRTO_MAXBW]              = VARIANT_TYPE_INT64,
+  [SRTO_STATE]              = VARIANT_TYPE_INT32,
+  [SRTO_EVENT]              = VARIANT_TYPE_INT32,
+  [SRTO_SNDDATA]            = VARIANT_TYPE_INT32,
+  [SRTO_RCVDATA]            = VARIANT_TYPE_INT32,
+  [SRTO_SENDER]             = VARIANT_TYPE_BOOLEAN,
+  [SRTO_TSBPDMODE]          = VARIANT_TYPE_BOOLEAN,
+  [SRTO_LATENCY]            = VARIANT_TYPE_INT32,
+  [SRTO_INPUTBW]            = VARIANT_TYPE_INT64,
+  [SRTO_OHEADBW]            = VARIANT_TYPE_INT32,
+  [SRTO_PASSPHRASE]         = VARIANT_TYPE_STRING,
+  [SRTO_PBKEYLEN]           = VARIANT_TYPE_INT32,
+  [SRTO_KMSTATE]            = VARIANT_TYPE_INT32,
+  [SRTO_IPTTL]              = VARIANT_TYPE_INT32,
+  [SRTO_IPTOS]              = VARIANT_TYPE_INT32,
+  [SRTO_TLPKTDROP]          = VARIANT_TYPE_BOOLEAN,
+  [SRTO_SNDDROPDELAY]       = VARIANT_TYPE_INT32,
+  [SRTO_NAKREPORT]          = VARIANT_TYPE_BOOLEAN,
+  [SRTO_VERSION]            = VARIANT_TYPE_INT32,
+  [SRTO_PEERVERSION]        = VARIANT_TYPE_INT32,
+  [SRTO_CONNTIMEO]          = VARIANT_TYPE_INT32,
+  [SRTO_DRIFTTRACER]        = VARIANT_TYPE_BOOLEAN,
+  [SRTO_SNDKMSTATE]         = VARIANT_TYPE_INT32,
+  [SRTO_RCVKMSTATE]         = VARIANT_TYPE_INT32,
+  [SRTO_LOSSMAXTTL]         = VARIANT_TYPE_INT32,
+  [SRTO_RCVLATENCY]         = VARIANT_TYPE_INT32,
+  [SRTO_PEERLATENCY]        = VARIANT_TYPE_INT32,
+  [SRTO_MINVERSION]         = VARIANT_TYPE_INT32,
+  [SRTO_STREAMID]           = VARIANT_TYPE_STRING,
+  [SRTO_CONGESTION]         = VARIANT_TYPE_STRING,
+  [SRTO_MESSAGEAPI]         = VARIANT_TYPE_BOOLEAN,
+  [SRTO_PAYLOADSIZE]        = VARIANT_TYPE_INT32,
+  [SRTO_TRANSTYPE]          = VARIANT_TYPE_INT32,
+  [SRTO_KMREFRESHRATE]      = VARIANT_TYPE_INT32,
+  [SRTO_KMPREANNOUNCE]      = VARIANT_TYPE_INT32,
+  [SRTO_ENFORCEDENCRYPTION] = VARIANT_TYPE_BOOLEAN,
+  [SRTO_IPV6ONLY]           = VARIANT_TYPE_INT32,
+  [SRTO_PEERIDLETIMEO]      = VARIANT_TYPE_INT32,
+ #if ENABLE_EXPERIMENTAL_BONDING
+  [SRTO_GROUPCONNECT]       = VARIANT_TYPE_INT32,
+  [SRTO_GROUPSTABTIMEO]     = VARIANT_TYPE_INT32,
+  [SRTO_GROUPTYPE]          = VARIANT_TYPE_INT32,
+ #endif
+  [SRTO_BINDTODEVICE]       = VARIANT_TYPE_STRING,
+  [SRTO_PACKETFILTER]       = VARIANT_TYPE_STRING,
+  [SRTO_RETRANSMITALGO]     = VARIANT_TYPE_INT32,
+};
+/* *INDENT-ON* */
+
+GVariant *
+hwangsae_relay_get_socket_option (HwangsaeRelay * relay, SRTSOCKET sock,
+    gint option, GError ** error)
+{
+  union
+  {
+    gint32 i32;
+    gint64 i64;
+    gboolean bool;
+    gchar str[OPT_STR_MAXLEN];
+    struct linger linger;
+    void *val;
+  } val;
+  const GVariantType *type = srt_options[option].type;
+  gint optlen = srt_options[option].optlen;
+  g_autoptr (GError) gerror = NULL;
+
+  if (option < 0 || option >= G_N_ELEMENTS (srt_options)) {
+    gerror = g_error_new (HWANGSAE_RELAY_ERROR,
+        HWANGSAE_RELAY_ERROR_UNKNOWN_SOCKOPT, "Unknown socket option %d",
+        option);
+    goto error;
+  }
+
+  if (srt_getsockflag (sock, option, &val, &optlen) == SRT_ERROR) {
+    gerror = g_error_new (HWANGSAE_RELAY_ERROR, HWANGSAE_RELAY_ERROR_SOCKOPT,
+        "Error reading socket option %d: %s", option, srt_getlasterror_str ());
+    goto error;
+  }
+
+  if (g_variant_type_equal (type, G_VARIANT_TYPE_INT32)) {
+    return g_variant_new_int32 (val.i32);
+  }
+  if (g_variant_type_equal (type, G_VARIANT_TYPE_INT64)) {
+    return g_variant_new_int64 (val.i64);
+  }
+  if (g_variant_type_equal (type, G_VARIANT_TYPE_BOOLEAN)) {
+    return g_variant_new_boolean (val.bool);
+  }
+  if (g_variant_type_equal (type, G_VARIANT_TYPE_STRING)) {
+    return g_variant_new_string (val.str);
+  }
+  if (g_variant_type_equal (type, HWANGSAE_VARIANT_TYPE_LINGER)) {
+    return g_variant_new ((const gchar *) HWANGSAE_VARIANT_TYPE_LINGER,
+        val.linger.l_onoff, val.linger.l_linger);
+  }
+
+error:
+  if (error) {
+    g_propagate_error (error, gerror);
+    gerror = NULL;
+  }
+  return NULL;
+}
+
 void
 hwangsae_relay_set_latency (HwangsaeRelay * self,
     HwangsaeCallerDirection direction, gint latency)

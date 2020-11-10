@@ -89,6 +89,21 @@ const gchar            *hwangsae_relay_get_sink_uri     (HwangsaeRelay *relay);
 const gchar            *hwangsae_relay_get_source_uri   (HwangsaeRelay *relay);
 
 /**
+ * hwangsae_relay_get_socket_option:
+ * @relay: a HwangsaeRelay object
+ * @socket_id: a caller's SRT socket ID obtained from "caller-accepted" signal
+ * @option: ID of a SRT socket option. See libsrt API for supported options.
+ * @error: a location to receive a GError if the call fails
+ *
+ * Returns: The socket option value as a GVariant. On error returns NULL and
+ * sets @error.
+ */
+GVariant               *hwangsae_relay_get_socket_option(HwangsaeRelay *relay,
+                                                         gint           socket_id,
+                                                         gint           option,
+                                                         GError       **error);
+
+/**
  * hwangsae_relay_disconnect_sink:
  * @relay: a HwangsaeRelay object
  * @username: SRT Stream ID username of the sink to disconnect
