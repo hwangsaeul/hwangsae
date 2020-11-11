@@ -467,9 +467,9 @@ hwangsae_relay_class_init (HwangsaeRelayClass * klass)
 
   signals[SIG_CALLER_REJECTED] =
       g_signal_new ("caller-rejected", G_TYPE_FROM_CLASS (klass),
-      G_SIGNAL_RUN_LAST, 0, NULL, NULL, NULL, G_TYPE_NONE, 5,
+      G_SIGNAL_RUN_LAST, 0, NULL, NULL, NULL, G_TYPE_NONE, 6,
       G_TYPE_INT, HWANGSAE_TYPE_CALLER_DIRECTION, G_TYPE_SOCKET_ADDRESS,
-      G_TYPE_STRING, G_TYPE_STRING);
+      G_TYPE_STRING, G_TYPE_STRING, HWANGSAE_TYPE_REJECT_REASON);
 
   signals[SIG_CALLER_CLOSED] =
       g_signal_new ("caller-closed", G_TYPE_FROM_CLASS (klass),
@@ -603,6 +603,7 @@ hwangsae_relay_authenticate_sink (HwangsaeRelay * self, SRTSOCKET sock,
   g_autofree gchar *username_autofree = NULL;
   gchar *username = NULL;
   g_autofree gchar *resource = NULL;
+  HwangsaeRejectReason reason;
 
   {
     gboolean authenticated;
@@ -613,10 +614,14 @@ hwangsae_relay_authenticate_sink (HwangsaeRelay * self, SRTSOCKET sock,
       _parse_stream_id (stream_id, &username, &resource);
       username_autofree = username;
 
-      if (!username
-          || g_hash_table_contains (self->username_sink_map, username)) {
-        /* Sink socket must have username in its Stream ID and not been already
-         * registered. */
+      /* Sink socket must have username in its Stream ID and not been already
+       * registered. */
+      if (!username) {
+        reason = HWANGSAE_REJECT_REASON_NO_USERNAME;
+        goto reject;
+      }
+      if (g_hash_table_contains (self->username_sink_map, username)) {
+        reason = HWANGSAE_REJECT_REASON_USERNAME_ALREADY_REGISTERED;
         goto reject;
       }
 
@@ -625,17 +630,20 @@ hwangsae_relay_authenticate_sink (HwangsaeRelay * self, SRTSOCKET sock,
           &authenticated);
 
       if (!authenticated) {
+        reason = HWANGSAE_REJECT_REASON_AUTHENTICATION;
         goto reject;
       }
 
     } else if (g_hash_table_size (self->srtsocket_sink_map) != 0) {
       /* When authentication is off, only one sink can connect. */
+      reason = HWANGSAE_REJECT_REASON_TOO_MANY_SINKS;
       goto reject;
     }
   }
 
   if (!hwangsae_relay_set_socket_encryption (self, sock,
           HWANGSAE_CALLER_DIRECTION_SINK, addr, username, resource)) {
+    reason = HWANGSAE_REJECT_REASON_ENCRYPTION;
     goto reject;
   }
 
@@ -643,7 +651,7 @@ hwangsae_relay_authenticate_sink (HwangsaeRelay * self, SRTSOCKET sock,
 
 reject:
   g_signal_emit (self, signals[SIG_CALLER_REJECTED], 0, sock,
-      HWANGSAE_CALLER_DIRECTION_SINK, addr, username, resource);
+      HWANGSAE_CALLER_DIRECTION_SINK, addr, username, resource, reason);
 
   return -1;
 }
@@ -726,6 +734,7 @@ hwangsae_relay_authenticate_source (HwangsaeRelay * self, SRTSOCKET sock,
   g_autofree gchar *username = NULL;
   g_autofree gchar *resource = NULL;
   SinkConnection *sink = NULL;
+  HwangsaeRejectReason reason;
   g_autofree gchar *ip =
       g_inet_address_to_string (g_inet_socket_address_get_address
       (G_INET_SOCKET_ADDRESS (addr)));
@@ -742,6 +751,7 @@ hwangsae_relay_authenticate_source (HwangsaeRelay * self, SRTSOCKET sock,
         // Source socket must specify ID of the sink stream it wants to receive.
         g_debug ("Rejecting source %d. No Resource Name found in Stream ID.",
             sock);
+        reason = HWANGSAE_REJECT_REASON_NO_RESOURCE;
         goto reject;
       }
 
@@ -757,6 +767,7 @@ hwangsae_relay_authenticate_source (HwangsaeRelay * self, SRTSOCKET sock,
 
     if (!sink && !self->master_address) {
       /* Reject the attempt to connect an unknown sink. */
+      reason = HWANGSAE_REJECT_REASON_NO_SUCH_SINK;
       goto reject;
     }
 
@@ -767,12 +778,14 @@ hwangsae_relay_authenticate_source (HwangsaeRelay * self, SRTSOCKET sock,
     }
 
     if (!authenticated) {
+      reason = HWANGSAE_REJECT_REASON_AUTHENTICATION;
       goto reject;
     }
   }
 
   if (!hwangsae_relay_set_socket_encryption (self, sock,
           HWANGSAE_CALLER_DIRECTION_SRC, addr, username, resource)) {
+    reason = HWANGSAE_REJECT_REASON_ENCRYPTION;
     goto reject;
   }
 
@@ -780,7 +793,7 @@ hwangsae_relay_authenticate_source (HwangsaeRelay * self, SRTSOCKET sock,
 
 reject:
   g_signal_emit (self, signals[SIG_CALLER_REJECTED], 0, sock,
-      HWANGSAE_CALLER_DIRECTION_SRC, addr, username, resource);
+      HWANGSAE_CALLER_DIRECTION_SRC, addr, username, resource, reason);
   return -1;
 }
 
@@ -793,7 +806,7 @@ hwangsae_relay_accept_source (HwangsaeRelay * self)
   SinkConnection *sink;
   SourceConnection *source;
   SRTSOCKET sock;
-  guint sigid = SIG_CALLER_ACCEPTED;
+  HwangsaeRejectReason reason;
 
   sock = _srt_accept (self->source_listen_sock, &addr, &username, &resource);
   if (sock == SRT_INVALID_SOCK) {
@@ -810,6 +823,7 @@ hwangsae_relay_accept_source (HwangsaeRelay * self)
       master_sock = hwangsae_relay_open_master_sock (self, resource);
       if (master_sock == SRT_INVALID_SOCK) {
         g_debug ("Unable to open master SRT socket");
+        reason = HWANGSAE_REJECT_REASON_CANT_CONNECT_MASTER;
         goto reject;
       }
 
@@ -833,6 +847,7 @@ hwangsae_relay_accept_source (HwangsaeRelay * self)
   }
 
   if (!sink) {
+    reason = HWANGSAE_REJECT_REASON_NO_SUCH_SINK;
     goto reject;
   }
 
@@ -851,15 +866,15 @@ hwangsae_relay_accept_source (HwangsaeRelay * self)
 
   sink->sources = g_slist_append (sink->sources, source);
 
-  goto accept;
+  g_signal_emit (self, signals[SIG_CALLER_ACCEPTED], 0, source->socket,
+      HWANGSAE_CALLER_DIRECTION_SRC, addr, username, resource);
+
+  return;
 
 reject:
   srt_close (sock);
-  sigid = SIG_CALLER_REJECTED;
-
-accept:
-  g_signal_emit (self, signals[sigid], 0, source->socket,
-      HWANGSAE_CALLER_DIRECTION_SRC, addr, username, resource);
+  g_signal_emit (self, signals[SIG_CALLER_REJECTED], 0, sock,
+      HWANGSAE_CALLER_DIRECTION_SRC, addr, username, resource, reason);
 }
 
 static void
