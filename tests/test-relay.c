@@ -207,7 +207,8 @@ test_m_to_n (void)
 static void
 _on_sink_rejected (HwangsaeRelay * relay, gint id,
     HwangsaeCallerDirection direction, GInetSocketAddress * addr,
-    const gchar * username, const gchar * resource, gpointer data)
+    const gchar * username, const gchar * resource, HwangsaeRejectReason reason,
+    gpointer data)
 {
   GInetAddress *ip = NULL;
   g_autofree gchar *ip_str = NULL;
@@ -222,6 +223,7 @@ _on_sink_rejected (HwangsaeRelay * relay, gint id,
   local_ip_str = hwangsae_common_get_local_ip ();
 
   g_assert_cmpstr (ip_str, ==, local_ip_str);
+  g_assert_cmpint (reason, ==, HWANGSAE_REJECT_REASON_NO_USERNAME);
 
   g_main_loop_quit (data);
 }
@@ -251,7 +253,8 @@ test_reject_sink (void)
 static void
 _on_source_rejected (HwangsaeRelay * relay, int id,
     HwangsaeCallerDirection direction, GInetSocketAddress * addr,
-    const gchar * username, const gchar * resource, gpointer data)
+    const gchar * username, const gchar * resource, HwangsaeRejectReason reason,
+    gpointer data)
 {
   GInetAddress *ip = NULL;
   g_autofree gchar *ip_str = NULL;
@@ -263,6 +266,7 @@ _on_source_rejected (HwangsaeRelay * relay, int id,
   ip_str = g_inet_address_to_string (ip);
 
   g_assert_cmpstr (ip_str, ==, "127.0.0.1");
+  g_assert_cmpint (reason, ==, HWANGSAE_REJECT_REASON_NO_RESOURCE);
 
   g_main_loop_quit (data);
 }
@@ -344,7 +348,7 @@ _caller_accepted (HwangsaeRelay * relay, gint id,
 static void
 _caller_rejected (HwangsaeRelay * relay, gint id,
     HwangsaeCallerDirection direction, GSocketAddress * addr,
-    const gchar * username, const gchar * resource,
+    const gchar * username, const gchar * resource, HwangsaeRejectReason reason,
     AuthenticationTestData * data)
 {
   switch (direction) {
@@ -357,6 +361,8 @@ _caller_rejected (HwangsaeRelay * relay, gint id,
     default:
       g_assert_not_reached ();
   }
+
+  g_assert_cmpint (reason, ==, HWANGSAE_REJECT_REASON_AUTHENTICATION);
 }
 
 static void
@@ -413,11 +419,9 @@ test_authentication (void)
 }
 
 static void
-_flip_flag (HwangsaeRelay * relay, gint id, HwangsaeCallerDirection direction,
-    GInetSocketAddress * addr, const gchar * username, const gchar * resource,
-    gpointer data)
+_flip_flag (gboolean * data)
 {
-  *(gboolean *) data = TRUE;
+  *data = TRUE;
 }
 
 static void
@@ -442,7 +446,7 @@ test_no_auth (void)
 
   /* Connect first streamer. */
 
-  g_signal_connect (relay, "caller-accepted", (GCallback) _flip_flag,
+  g_signal_connect_swapped (relay, "caller-accepted", (GCallback) _flip_flag,
       &stream1_accepted);
 
   g_object_set (stream1, "resolution", data1.resolution, NULL);
@@ -457,7 +461,7 @@ test_no_auth (void)
 
   /* Try connecting second stream. In unauthenticated mode this should fail. */
 
-  g_signal_connect (relay, "caller-rejected", (GCallback) _flip_flag,
+  g_signal_connect_swapped (relay, "caller-rejected", (GCallback) _flip_flag,
       &stream2_rejected);
 
   hwangsae_test_streamer_set_uri (stream2, hwangsae_relay_get_sink_uri (relay));
@@ -525,13 +529,15 @@ _slave_accepted (HwangsaeRelay * relay, gint id,
 static void
 _slave_rejected (HwangsaeRelay * relay, gint id,
     HwangsaeCallerDirection direction, GInetSocketAddress * addr,
-    const gchar * username, const gchar * resource, SlaveTestData * data)
+    const gchar * username, const gchar * resource, HwangsaeRejectReason reason,
+    SlaveTestData * data)
 {
   if (direction == HWANGSAE_CALLER_DIRECTION_SRC) {
     g_debug ("Slave rejected");
 
     g_assert_cmpstr (username, ==, REJECTED_SRC);
     g_assert_cmpstr (resource, ==, MASTER_STREAM_RESOURCE);
+    g_assert_cmpint (reason, ==, HWANGSAE_REJECT_REASON_AUTHENTICATION);
 
     data->slave_rejected = TRUE;
   }
@@ -540,13 +546,15 @@ _slave_rejected (HwangsaeRelay * relay, gint id,
 static void
 _receiver_rejected (HwangsaeRelay * relay, gint id,
     HwangsaeCallerDirection direction, GInetSocketAddress * addr,
-    const gchar * username, const gchar * resource, SlaveTestData * data)
+    const gchar * username, const gchar * resource, HwangsaeRejectReason reason,
+    SlaveTestData * data)
 {
   if (direction == HWANGSAE_CALLER_DIRECTION_SRC) {
     g_debug ("Receiver rejected");
 
     g_assert_cmpstr (username, ==, RECEIVER_USERNAME);
     g_assert_cmpstr (resource, ==, MASTER_STREAM_RESOURCE);
+    g_assert_cmpint (reason, ==, HWANGSAE_REJECT_REASON_CANT_CONNECT_MASTER);
 
     data->receiver_rejected = TRUE;
   }
