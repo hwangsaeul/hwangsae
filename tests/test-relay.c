@@ -486,10 +486,26 @@ test_no_auth (void)
 
 typedef struct
 {
+  gboolean sink_accepted;
   gboolean slave_accepted;
   gboolean slave_rejected;
   gboolean receiver_rejected;
 } SlaveTestData;
+
+static void
+_sink_accepted (HwangsaeRelay * relay, gint id,
+    HwangsaeCallerDirection direction, GInetSocketAddress * addr,
+    const gchar * username, const gchar * resource, SlaveTestData * data)
+{
+  if (direction == HWANGSAE_CALLER_DIRECTION_SINK) {
+    g_assert_cmpstr (username, ==, MASTER_STREAM_RESOURCE);
+    g_assert_cmpstr (resource, ==, NULL);
+
+    g_debug ("Sink accepted");
+
+    data->sink_accepted = TRUE;
+  }
+}
 
 static void
 _slave_accepted (HwangsaeRelay * relay, gint id,
@@ -551,6 +567,8 @@ test_slave (void)
 
   g_object_set (master, "authentication", TRUE, NULL);
   g_signal_connect (master, "authenticate", (GCallback) _authenticate, NULL);
+  g_signal_connect (master, "caller-accepted", (GCallback) _sink_accepted,
+      &data);
   g_signal_connect (master, "caller-rejected", (GCallback) _slave_rejected,
       &data);
   g_signal_connect (slave, "caller-rejected", (GCallback) _receiver_rejected,
@@ -565,6 +583,11 @@ test_slave (void)
 
   hwangsae_test_streamer_set_uri (stream, hwangsae_relay_get_sink_uri (master));
   hwangsae_test_streamer_start (stream);
+
+  /* Wait until the streamer connects to the master relay as a sink. */
+  while (!data.sink_accepted) {
+    g_main_context_iteration (NULL, FALSE);
+  }
 
   receiver = hwangsae_test_make_receiver (stream, slave, RECEIVER_USERNAME);
 
