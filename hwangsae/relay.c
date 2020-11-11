@@ -1006,7 +1006,7 @@ static void
 hwangsae_relay_init (HwangsaeRelay * self)
 {
   if (g_atomic_int_add (&hwangsae_relay_init_refcnt, 1) == 0) {
-    if (srt_startup () != 0) {
+    if (srt_startup () == -1) {
       g_error ("%s", srt_getlasterror_str ());
     }
   }
