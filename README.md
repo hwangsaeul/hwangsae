@@ -2,11 +2,12 @@
 
 # Hwangsae
 
-**Hwangsae** means *stork* and acts mainly as the SRT relay to provide the lowest latency to end-user.
+*Hwangsae* is a library that implements forwarding and stream access control
+services for Hwangsaeul.
 
-## Overview
+For C API of *libhwangsae* see [relay.h](hwangsae/relay.h).
 
-TBD
+For relay service that makes use of *libhwangsae* see [Gaeul relay agent](https://github.com/hwangsaeul/gaeul/blob/master/README.md).
 
 ## PPA nightly builds
 
