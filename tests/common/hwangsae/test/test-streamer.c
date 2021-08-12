@@ -39,6 +39,9 @@ hwangsae_test_streamer_thread_func (HwangsaeTestStreamer * self)
   g_autoptr (GMainContext) context = g_main_context_new ();
   g_autoptr (GError) error = NULL;
   g_autoptr (GstUri) uri = NULL;
+  g_autoptr (GVariant) attributes = NULL;
+  GVariantDict attr;
+
   const gchar *mode_str;
   GaeguliSRTMode mode = GAEGULI_SRT_MODE_UNKNOWN;
   GaeguliTarget *target;
@@ -55,9 +58,18 @@ hwangsae_test_streamer_thread_func (HwangsaeTestStreamer * self)
   }
   g_assert (mode != GAEGULI_SRT_MODE_UNKNOWN);
 
-  target = gaeguli_pipeline_add_srt_target_full (self->pipeline,
-      GAEGULI_VIDEO_CODEC_H264_X264, 2048000, self->uri, self->username,
-      &error);
+  g_variant_dict_init (&attr, NULL);
+
+  g_variant_dict_insert (&attr, "codec", "i", GAEGULI_VIDEO_CODEC_H264_X264);
+  g_variant_dict_insert (&attr, "is-record", "b", FALSE);
+  g_variant_dict_insert (&attr, "uri", "s", self->uri);
+  g_variant_dict_insert (&attr, "username", "s", self->username);
+  g_variant_dict_insert (&attr, "bitrate", "u", 2048000);
+
+  attributes = g_variant_dict_end (&attr);
+
+  target = gaeguli_pipeline_add_target_full (self->pipeline,
+      attributes, &error);
   g_assert_no_error (error);
 
   gaeguli_target_start (target, &error);
