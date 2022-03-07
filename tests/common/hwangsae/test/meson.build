@@ -29,6 +29,6 @@ pkg.generate(libhwangsae_test_common,
 
 libhwangsae_test_common_dep = declare_dependency(
   link_with: libhwangsae_test_common,
-  dependencies: libhwangsae_dep,
+  dependencies: [ gio_dep, libhwangsae_dep ],
   include_directories: libhwangsae_test_common_includes,
 )
